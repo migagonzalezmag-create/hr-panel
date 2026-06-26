@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Planificación Horaria - HRnini</title>
+<style>
+:root {
+  --bg:#0a0d14; --surface:#111520; --surface2:#161c2d; --border:#1e2640;
+  --a:#4f8ef7; --b:#7c5cbf; --c:#2ecfa8; --w:#f7a34f; --d:#f75f5f;
+  --text:#e8eaf2; --dim:#6b738f; --mid:#9ba3bb;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); }
+
+.container { max-width:1400px; margin:0 auto; padding:24px; }
+
+.section-header { margin-bottom:24px; }
+.section-header h2 { font-family:'Syne',sans-serif; font-size:22px; font-weight:800; margin-bottom:8px; }
+.section-header p { color:var(--mid); font-size:13px; }
+
+.controls { display:flex; gap:16px; margin-bottom:20px; flex-wrap:wrap; align-items:center; }
+.control-group { display:flex; gap:10px; align-items:center; }
+.control-group label { font-size:12px; font-weight:600; color:var(--mid); text-transform:uppercase; }
+.control-group select { padding:8px 12px; background:var(--surface2); border:1px solid var(--border); color:var(--text); border-radius:8px; font-family:inherit; font-size:13px; }
+
+.btn { padding:9px 18px; border-radius:10px; border:none; font-family:inherit; font-weight:600; font-size:12px; cursor:pointer; transition:all .2s; }
+.btn-primary { background:linear-gradient(135deg,var(--a),var(--b)); color:#fff; }
+.btn-primary:hover { opacity:.9; }
+
+.resumen { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:20px; }
+.resumen-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px; }
+.resumen-card-label { font-size:11px; color:var(--dim); text-transform:uppercase; margin-bottom:6px; }
+.resumen-card-value { font-family:'Syne',sans-serif; font-size:24px; font-weight:800; }
+
+.tabla-container { background:var(--surface); border:1px solid var(--border); border-radius:14px; overflow:hidden; margin-bottom:20px; }
+.tabla-header { padding:16px 18px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+.tabla-scroll { overflow-x:auto; }
+table { width:100%; border-collapse:collapse; }
+th { text-align:left; padding:9px 12px; font-size:10px; font-weight:600; color:var(--dim); text-transform:uppercase; background:var(--surface2); border-bottom:1px solid var(--border); }
+td { padding:9px 12px; font-size:12px; border-bottom:1px solid rgba(30,38,64,.5); }
+tr:hover td { background:rgba(79,142,247,.03); }
+
+.loading { text-align:center; padding:40px; color:var(--dim); }
+.pill { display:inline-flex; align-items:center; padding:2px 9px; border-radius:20px; font-size:10px; font-weight:600; background:rgba(107,115,143,.15); color:var(--mid); }
+
+@media(max-width:768px) {
+  .controls { flex-direction:column; align-items:stretch; }
+  .resumen { grid-template-columns:1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <div class="section-header">
+    <h2>Planificación Horaria</h2>
+    <p>Carga de horarios semanales, quincenales o mensuales</p>
+  </div>
+
+  <!-- CONTROLES -->
+  <div class="controls">
+    <div class="control-group">
+      <label>Período:</label>
+      <select id="tipo-periodo">
+        <option value="SEMANAL">Semana</option>
+        <option value="QUINCENAL">Quincena</option>
+        <option value="MENSUAL">Mes</option>
+      </select>
+    </div>
+    <div class="control-group">
+      <label>Desde:</label>
+      <input type="date" id="fecha-desde">
+    </div>
+    <div class="control-group">
+      <label>Sector:</label>
+      <select id="selector-sector">
+        <option value="">Cargando sectores...</option>
+      </select>
+    </div>
+    <div class="control-group">
+      <label>Tarea:</label>
+      <select id="selector-tarea">
+        <option value="">Seleccionar primero un sector</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- RESUMEN -->
+  <div class="resumen">
+    <div class="resumen-card">
+      <div class="resumen-card-label">Total Empleados</div>
+      <div class="resumen-card-value" id="resumen-total">0</div>
+    </div>
+    <div class="resumen-card">
+      <div class="resumen-card-label">Fijos</div>
+      <div class="resumen-card-value" id="resumen-fijos">0</div>
+    </div>
+    <div class="resumen-card">
+      <div class="resumen-card-label">Rotativos</div>
+      <div class="resumen-card-value" id="resumen-rotativos">0</div>
+    </div>
+    <div class="resumen-card">
+      <div class="resumen-card-label">Total Horas</div>
+      <div class="resumen-card-value" id="resumen-horas">0</div>
+    </div>
+  </div>
+
+  <!-- TABLA DE EMPLEADOS -->
+  <div class="tabla-container">
+    <div class="tabla-header">
+      <h3 style="font-family:'Syne',sans-serif; font-size:13px; font-weight:700;">Empleados de tu Sector</h3>
+      <span id="tabla-count" class="pill">0 empleados</span>
+    </div>
+    <div class="tabla-scroll">
+      <table id="tabla-empleados">
+        <thead>
+          <tr>
+            <th>Legajo</th>
+            <th>Nombre</th>
+            <th>Tipo</th>
+            <th>Lun</th>
+            <th>Mar</th>
+            <th>Mié</th>
+            <th>Jue</th>
+            <th>Vie</th>
+            <th>Sab</th>
+            <th>Dom</th>
+            <th>Total Hs</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-body">
+          <tr><td colspan="11" style="text-align:center; padding:20px;">Selecciona un sector y tarea</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- BOTONES ACCIÓN -->
+  <div class="controls" style="margin-top:20px;">
+    <button class="btn btn-primary" onclick="enviarARH()">✅ Enviar a RH</button>
+    <button class="btn btn-primary" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="guardarBorrador()">💾 Guardar Borrador</button>
+    <button class="btn btn-primary" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="verHistorico()">📜 Ver Histórico</button>
+  </div>
+
+</div>
+
+<script>
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby9nJR5GZ3_1ZVm6HOMJBTF6vA8FOn_ioaL1rE7kOJbpKm_rCd4xcGR4yIgKdOSrjwvKQ/exec";
+
+let empleados = [];
+let turnos = [];
+
+document.addEventListener('DOMContentLoaded', () => {
+  console.log("🚀 Inicializando Planificación Horaria...");
+  setearFechaHoy();
+  cargarDatos();
+});
+
+function setearFechaHoy() {
+  const hoy = new Date();
+  const yyyy = hoy.getFullYear();
+  const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+  const dd = String(hoy.getDate()).padStart(2, '0');
+  document.getElementById('fecha-desde').value = `${yyyy}-${mm}-${dd}`;
+}
+
+async function cargarDatos() {
+  try {
+    console.log("📡 Cargando empleados...");
+    const resEmpleados = await fetch(APPS_SCRIPT_URL + "?sheet=mod35071");
+    if(!resEmpleados.ok) throw new Error(`HTTP ${resEmpleados.status}`);
+    
+    const dataEmpleados = await resEmpleados.json();
+    console.log("✅ Empleados:", dataEmpleados.length);
+    
+    empleados = dataEmpleados.map(e => ({
+      legajo: String(e.Legajo || '').trim(),
+      nombre: e.Nombre || '',
+      sector: String(e.Sector || '').trim(),
+      tarea: String(e.Tarea || '').trim(),
+      horario: String(e.HORARIO || '').trim(),
+      ubicacion: e.Ubicación || '',
+      convenio: e.Convenio || '',
+      tipo: (String(e.HORARIO || '').toLowerCase() === 'rotativo') ? 'ROTATIVO' : 'FIJO'
+    })).filter(e => e.legajo && e.nombre);
+    
+    console.log("📡 Cargando turnos...");
+    const resTurnos = await fetch(APPS_SCRIPT_URL + "?sheet=Turnos");
+    if(!resTurnos.ok) throw new Error(`HTTP ${resTurnos.status}`);
+    
+    const dataTurnos = await resTurnos.json();
+    console.log("✅ Turnos:", dataTurnos.length);
+    
+    turnos = dataTurnos.map(t => ({
+      codigo: String(t.Codigo || '').trim(),
+      descripcion: t.Descripcion || '',
+      horaIni: t['Hora inicio'] || '',
+      horaFin: t['Hora fin'] || ''
+    }));
+    
+    poblarSelectores();
+    console.log("✅ Todo cargado");
+    
+  } catch(e) {
+    console.error("❌ Error:", e.message);
+    alert("Error: " + e.message);
+  }
+}
+
+function poblarSelectores() {
+  const sectores = [...new Set(empleados.map(e => e.sector).filter(s => s))].sort();
+  console.log("📊 Sectores:", sectores);
+  
+  const selectorSector = document.getElementById('selector-sector');
+  selectorSector.innerHTML = '<option value="">Seleccionar sector...</option>';
+  
+  sectores.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s;
+    opt.textContent = s;
+    selectorSector.appendChild(opt);
+  });
+  
+  selectorSector.addEventListener('change', () => {
+    const sector = selectorSector.value;
+    if(!sector) {
+      document.getElementById('selector-tarea').innerHTML = '<option value="">Seleccionar sector primero</option>';
+      return;
+    }
+    
+    const tareas = [...new Set(empleados.filter(e => e.sector === sector).map(e => e.tarea).filter(t => t))].sort();
+    console.log("📊 Tareas para " + sector + ":", tareas);
+    
+    const selectorTarea = document.getElementById('selector-tarea');
+    selectorTarea.innerHTML = '<option value="">Seleccionar tarea...</option>';
+    
+    tareas.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t;
+      opt.textContent = t;
+      selectorTarea.appendChild(opt);
+    });
+    
+    selectorTarea.addEventListener('change', cargarTablaEmpleados);
+  });
+}
+
+function cargarTablaEmpleados() {
+  const sector = document.getElementById('selector-sector').value;
+  const tarea = document.getElementById('selector-tarea').value;
+  
+  if(!sector || !tarea) {
+    document.getElementById('tabla-body').innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px;">Selecciona sector y tarea</td></tr>';
+    return;
+  }
+  
+  const empleadosFiltrados = empleados.filter(e => e.sector === sector && e.tarea === tarea);
+  console.log("📋 Empleados:", empleadosFiltrados.length);
+  
+  const tabla = document.getElementById('tabla-body');
+  tabla.innerHTML = '';
+  
+  let fijos = 0, rotativos = 0;
+  
+  empleadosFiltrados.forEach(emp => {
+    if(emp.tipo === 'FIJO') fijos++;
+    if(emp.tipo === 'ROTATIVO') rotativos++;
+    
+    const fila = document.createElement('tr');
+    fila.innerHTML = `
+      <td>${emp.legajo}</td>
+      <td>${emp.nombre}</td>
+      <td><span class="pill" style="background:${emp.tipo === 'FIJO' ? 'rgba(46,207,168,.15)' : 'rgba(247,163,79,.15)'};color:${emp.tipo === 'FIJO' ? '#2ecfa8' : '#f7a34f'}">${emp.tipo}</span></td>
+      <td><select style="padding:4px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:4px;font-size:11px">${turnosAsOptions()}</select></td>
+      <td><select style="padding:4px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:4px;font-size:11px">${turnosAsOptions()}</select></td>
+      <td><select style="padding:4px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:4px;font-size:11px">${turnosAsOptions()}</select></td>
+      <td><select style="padding:4px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:4px;font-size:11px">${turnosAsOptions()}</select></td>
+      <td><select style="padding:4px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:4px;font-size:11px">${turnosAsOptions()}</select></td>
+      <td><select style="padding:4px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:4px;font-size:11px">${turnosAsOptions()}</select></td>
+      <td><select style="padding:4px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:4px;font-size:11px">${turnosAsOptions()}</select></td>
+      <td style="text-align:center;font-weight:700">0</td>
+    `;
+    tabla.appendChild(fila);
+  });
+  
+  document.getElementById('resumen-total').textContent = empleadosFiltrados.length;
+  document.getElementById('resumen-fijos').textContent = fijos;
+  document.getElementById('resumen-rotativos').textContent = rotativos;
+  document.getElementById('tabla-count').textContent = `${empleadosFiltrados.length} empleados`;
+}
+
+function turnosAsOptions() {
+  let html = '<option value="">--</option>';
+  turnos.forEach(t => {
+    html += `<option value="${t.codigo}">${t.codigo}</option>`;
+  });
+  return html;
+}
+
+function enviarARH() { alert("✅ Función en desarrollo"); }
+function guardarBorrador() { alert("💾 Función en desarrollo"); }
+function verHistorico() { alert("📜 Función en desarrollo"); }
+
+console.log("✅ Planificación lista");
+</script>
+
+</body>
+</html>
