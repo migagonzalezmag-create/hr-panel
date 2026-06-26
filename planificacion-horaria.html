@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Planificación Horaria</title>
+<style>
+:root { --bg:#0a0d14; --surface:#111520; --surface2:#161c2d; --border:#1e2640; --a:#4f8ef7; --b:#7c5cbf; --c:#2ecfa8; --w:#f7a34f; --d:#f75f5f; --text:#e8eaf2; --dim:#6b738f; --mid:#9ba3bb; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); }
+.container { max-width:1400px; margin:0 auto; padding:24px; }
+.sh { margin-bottom:24px; }
+.sh h2 { font-family:'Syne',sans-serif; font-size:22px; font-weight:800; margin-bottom:8px; }
+.sh p { color:var(--mid); font-size:13px; }
+.ctrl { display:flex; gap:16px; margin-bottom:20px; flex-wrap:wrap; align-items:center; }
+.cg { display:flex; gap:10px; align-items:center; }
+.cg label { font-size:12px; font-weight:600; color:var(--mid); text-transform:uppercase; }
+.cg select { padding:8px 12px; background:var(--surface2); border:1px solid var(--border); color:var(--text); border-radius:8px; font-size:13px; }
+.btn { padding:9px 18px; border-radius:10px; border:none; font-family:inherit; font-weight:600; font-size:12px; cursor:pointer; }
+.bp { background:linear-gradient(135deg,var(--a),var(--b)); color:#fff; }
+.res { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:20px; }
+.rc { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px; }
+.rcl { font-size:11px; color:var(--dim); text-transform:uppercase; margin-bottom:6px; }
+.rcv { font-family:'Syne',sans-serif; font-size:24px; font-weight:800; }
+.tc { background:var(--surface); border:1px solid var(--border); border-radius:14px; overflow:hidden; margin-bottom:20px; }
+.th { padding:16px 18px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+.ts { overflow-x:auto; }
+table { width:100%; border-collapse:collapse; }
+th { text-align:left; padding:9px 12px; font-size:10px; font-weight:600; color:var(--dim); text-transform:uppercase; background:var(--surface2); border-bottom:1px solid var(--border); }
+td { padding:9px 12px; font-size:12px; border-bottom:1px solid rgba(30,38,64,.5); }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="sh">
+    <h2>Planificación Horaria</h2>
+    <p>Carga de horarios semanales, quincenales o mensuales</p>
+  </div>
+
+  <div class="ctrl">
+    <div class="cg"><label>Período:</label><select id="periodo"><option value="SEMANAL">Semana</option><option value="QUINCENAL">Quincena</option><option value="MENSUAL">Mes</option></select></div>
+    <div class="cg"><label>Desde:</label><input type="date" id="fecha"></div>
+    <div class="cg"><label>Sector:</label><select id="sector"><option value="">Cargando...</option></select></div>
+    <div class="cg"><label>Tarea:</label><select id="tarea"><option value="">Seleccionar sector</option></select></div>
+  </div>
+
+  <div class="res">
+    <div class="rc"><div class="rcl">Total</div><div class="rcv" id="t1">0</div></div>
+    <div class="rc"><div class="rcl">Fijos</div><div class="rcv" id="t2">0</div></div>
+    <div class="rc"><div class="rcl">Rotativos</div><div class="rcv" id="t3">0</div></div>
+    <div class="rc"><div class="rcl">Total Hs</div><div class="rcv" id="t4">0</div></div>
+  </div>
+
+  <div class="tc">
+    <div class="th"><h3 style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700">Empleados</h3><span id="count">0</span></div>
+    <div class="ts">
+      <table id="tabla">
+        <thead><tr><th>Legajo</th><th>Nombre</th><th>Tipo</th><th>Lun</th><th>Mar</th><th>Mié</th><th>Jue</th><th>Vie</th><th>Sab</th><th>Dom</th><th>Total</th></tr></thead>
+        <tbody id="body"><tr><td colspan="11" style="text-align:center;padding:20px">Cargando...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="ctrl" style="margin-top:20px">
+    <button class="btn bp" onclick="enviar()">✅ Enviar a RH</button>
+    <button class="btn bp" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="guardar()">💾 Guardar</button>
+  </div>
+</div>
+
+<script>
+const URL = "https://script.google.com/macros/s/AKfycby9nJR5GZ3_1ZVm6HOMJBTF6vA8FOn_ioaL1rE7kOJbpKm_rCd4xcGR4yIgKdOSrjwvKQ/exec";
+let empleados = [];
+let turnos = [];
+
+// SETEAR FECHA INMEDIATAMENTE
+function setFecha() {
+  const h = new Date();
+  const y = h.getFullYear();
+  const m = String(h.getMonth() + 1).padStart(2, '0');
+  const d = String(h.getDate()).padStart(2, '0');
+  document.getElementById('fecha').value = `${y}-${m}-${d}`;
+}
+
+// CARGAR DATOS INMEDIATAMENTE
+async function cargarDatos() {
+  try {
+    console.log('🚀 INICIANDO CARGA...');
+    
+    // EMPLEADOS
+    const r1 = await fetch(URL + '?sheet=mod35071');
+    const d1 = await r1.json();
+    console.log('✅ Empleados recibidos:', d1.length);
+    
+    empleados = d1.map(e => ({
+      legajo: String(e.Legajo || '').trim(),
+      nombre: e.Nombre || '',
+      sector: String(e.Sector || '').trim(),
+      tarea: String(e.Tarea || '').trim(),
+      tipo: String(e.HORARIO || '').toLowerCase() === 'rotativo' ? 'ROTATIVO' : 'FIJO'
+    })).filter(e => e.legajo && e.nombre && e.sector && e.tarea);
+    
+    console.log('✅ Empleados procesados:', empleados.length);
+    
+    // TURNOS
+    const r2 = await fetch(URL + '?sheet=Turnos');
+    const d2 = await r2.json();
+    console.log('✅ Turnos recibidos:', d2.length);
+    
+    turnos = d2.map(t => String(t.Codigo || '').trim()).filter(c => c);
+    
+    console.log('✅ Turnos procesados:', turnos.length);
+    
+    // POBLAR SELECTORES
+    poblarSectores();
+    
+  } catch(e) {
+    console.error('❌ ERROR:', e);
+    document.getElementById('body').innerHTML = '<tr><td colspan="11" style="color:var(--d);padding:20px">ERROR: ' + e.message + '</td></tr>';
+  }
+}
+
+function poblarSectores() {
+  const secs = [...new Set(empleados.map(e => e.sector))].sort();
+  console.log('📊 Sectores únicos:', secs);
+  
+  const sel = document.getElementById('sector');
+  sel.innerHTML = '<option value="">Seleccionar...</option>';
+  
+  secs.forEach(s => {
+    const o = document.createElement('option');
+    o.value = s;
+    o.textContent = s;
+    sel.appendChild(o);
+  });
+  
+  sel.addEventListener('change', function() {
+    const sector = this.value;
+    if (!sector) {
+      document.getElementById('tarea').innerHTML = '<option value="">Seleccionar sector</option>';
+      document.getElementById('body').innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px">Selecciona sector y tarea</td></tr>';
+      return;
+    }
+    
+    const tareas = [...new Set(empleados.filter(e => e.sector === sector).map(e => e.tarea))].sort();
+    console.log('📊 Tareas para', sector, ':', tareas);
+    
+    const selTarea = document.getElementById('tarea');
+    selTarea.innerHTML = '<option value="">Seleccionar...</option>';
+    tareas.forEach(t => {
+      const o = document.createElement('option');
+      o.value = t;
+      o.textContent = t;
+      selTarea.appendChild(o);
+    });
+  });
+}
+
+// CAMBIO DE TAREA
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('tarea').addEventListener('change', function() {
+    const sector = document.getElementById('sector').value;
+    const tarea = this.value;
+    
+    if (!sector || !tarea) return;
+    
+    const emps = empleados.filter(e => e.sector === sector && e.tarea === tarea);
+    console.log('📋 Empleados para', sector, '/', tarea, ':', emps.length);
+    
+    let fijos = 0, rotativos = 0;
+    emps.forEach(e => {
+      if (e.tipo === 'FIJO') fijos++;
+      else rotativos++;
+    });
+    
+    document.getElementById('t1').textContent = emps.length;
+    document.getElementById('t2').textContent = fijos;
+    document.getElementById('t3').textContent = rotativos;
+    document.getElementById('count').textContent = emps.length;
+    
+    const body = document.getElementById('body');
+    body.innerHTML = '';
+    
+    emps.forEach(e => {
+      const tr = document.createElement('tr');
+      const opts = turnos.map(t => `<option>${t}</option>`).join('');
+      tr.innerHTML = `
+        <td>${e.legajo}</td>
+        <td>${e.nombre}</td>
+        <td style="font-size:10px;background:${e.tipo === 'FIJO' ? 'rgba(46,207,168,.15)' : 'rgba(247,163,79,.15)'}">
+          <span style="color:${e.tipo === 'FIJO' ? '#2ecfa8' : '#f7a34f'}">${e.tipo}</span>
+        </td>
+        <td><select style="padding:3px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:3px;font-size:10px"><option>--</option>${opts}</select></td>
+        <td><select style="padding:3px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:3px;font-size:10px"><option>--</option>${opts}</select></td>
+        <td><select style="padding:3px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:3px;font-size:10px"><option>--</option>${opts}</select></td>
+        <td><select style="padding:3px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:3px;font-size:10px"><option>--</option>${opts}</select></td>
+        <td><select style="padding:3px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:3px;font-size:10px"><option>--</option>${opts}</select></td>
+        <td><select style="padding:3px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:3px;font-size:10px"><option>--</option>${opts}</select></td>
+        <td><select style="padding:3px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:3px;font-size:10px"><option>--</option>${opts}</select></td>
+        <td style="text-align:center;font-weight:700">0</td>
+      `;
+      body.appendChild(tr);
+    });
+  });
+  
+  // INICIAR
+  setFecha();
+  cargarDatos();
+});
+
+function enviar() { alert('✅ En desarrollo'); }
+function guardar() { alert('💾 En desarrollo'); }
+
+console.log('🎯 Script listo');
+</script>
+
+</body>
+</html>
