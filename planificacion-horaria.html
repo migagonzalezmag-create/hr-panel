@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="es" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Planificación Horaria · Nini</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0a0d14; --surface:#111520; --surface2:#161c2d; --border:#1e2640;
+  --a:#4f8ef7; --b:#7c5cbf; --c:#2ecfa8; --w:#f7a34f; --d:#f75f5f;
+  --text:#e8eaf2; --dim:#6b738f; --mid:#9ba3bb;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+
+/* LOGIN */
+#login{min-height:100vh;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(79,142,247,.12) 0%,transparent 70%),
+             radial-gradient(ellipse 60% 50% at 80% 100%,rgba(124,92,191,.10) 0%,transparent 60%),var(--bg);
+  position:relative;overflow:hidden}
+#login::before{content:'';position:absolute;inset:0;
+  background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);
+  background-size:60px 60px;opacity:.3}
+.lcard{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:20px;
+  padding:48px 44px;width:420px;box-shadow:0 0 60px rgba(79,142,247,.08),0 32px 64px rgba(0,0,0,.5);
+  animation:fadeUp .6s ease}
+.llogo{display:flex;align-items:center;gap:10px;margin-bottom:32px}
+.llogo-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--w),var(--d));border-radius:10px;
+  display:flex;align-items:center;justify-content:center;font-size:18px}
+.llogo h1{font-family:'Syne',sans-serif;font-size:18px;font-weight:700}
+.llogo span{color:var(--w)}
+.lcard h2{font-family:'Syne',sans-serif;font-size:26px;font-weight:800;margin-bottom:6px}
+.lcard>p{color:var(--mid);font-size:14px;margin-bottom:32px}
+.fg label{font-size:11px;color:var(--dim);font-weight:500;text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px;display:block}
+.fg input{width:100%;padding:12px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface2);
+  color:var(--text);font-family:inherit;font-size:14px;transition:border-color .2s}
+.fg input:focus{outline:none;border-color:var(--w)}
+.lbtn{width:100%;padding:14px;border-radius:12px;border:none;
+  background:linear-gradient(135deg,var(--w),var(--d));color:#fff;
+  font-family:'Syne',sans-serif;font-size:15px;font-weight:700;cursor:pointer;
+  transition:opacity .2s,transform .1s;letter-spacing:.3px}
+.lbtn:hover{opacity:.9;transform:translateY(-1px)}
+
+/* LOADING */
+#loading{display:none;min-height:100vh;align-items:center;justify-content:center;
+  flex-direction:column;gap:20px;background:var(--bg)}
+.spinner{width:44px;height:44px;border:3px solid var(--border);border-top-color:var(--w);
+  border-radius:50%;animation:spin .8s linear infinite}
+
+/* APP */
+#app{display:none;flex-direction:column;min-height:100vh}
+
+/* TOPBAR */
+.topbar{display:flex;align-items:center;justify-content:space-between;
+  padding:0 24px;height:60px;background:var(--surface);border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:100}
+.tlogo{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;display:flex;align-items:center;gap:8px}
+.dot{width:8px;height:8px;border-radius:50%;background:linear-gradient(135deg,var(--w),var(--d));
+  box-shadow:0 0 8px var(--w);animation:pulse 2s infinite}
+.navtabs{display:flex;gap:4px;background:var(--surface2);border-radius:10px;padding:4px}
+.ntab{padding:7px 14px;border-radius:7px;border:none;background:transparent;color:var(--dim);
+  font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;white-space:nowrap}
+.ntab.active{background:var(--surface);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.ntab:hover:not(.active){color:var(--mid)}
+.tright{display:flex;align-items:center;gap:10px}
+.rbadge{padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.5px}
+.ba{background:rgba(46,207,168,.15);color:var(--c);border:1px solid rgba(46,207,168,.25)}
+.bs{background:rgba(247,163,79,.15);color:var(--w);border:1px solid rgba(247,163,79,.25)}
+.bd{background:rgba(79,142,247,.15);color:var(--a);border:1px solid rgba(79,142,247,.25)}
+.xbtn{padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:transparent;
+  color:var(--dim);font-family:inherit;font-size:12px;cursor:pointer;transition:all .2s}
+.xbtn:hover{border-color:var(--d);color:var(--d)}
+
+/* CONTENT */
+.content{flex:1;padding:24px;max-width:1440px;margin:0 auto;width:100%}
+.sec{display:none;animation:fadeUp .3s ease}
+.sec.active{display:block}
+
+/* SECTION HEADER */
+.sh{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:12px}
+.sh h2{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:3px}
+.sh p{color:var(--mid);font-size:13px}
+
+/* KPI GRID */
+.kgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
+.kcard{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;position:relative;overflow:hidden}
+.kcard .kl{font-size:11px;color:var(--dim);text-transform:uppercase;margin-bottom:6px}
+.kcard .kv{font-family:'Syne',sans-serif;font-size:24px;font-weight:800}
+
+/* TABLE */
+.tbl-wrap{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:20px}
+.tbl-head{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.tbl-head h3{font-family:'Syne',sans-serif;font-size:13px;font-weight:700}
+.tbl-head span{font-size:12px;color:var(--dim)}
+.tbl-scroll{overflow:auto;max-height:70vh}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:9px 12px;font-size:10px;font-weight:600;color:var(--dim);text-transform:uppercase;
+  background:var(--surface2);border-bottom:1px solid var(--border);white-space:nowrap;
+  position:sticky;top:0;z-index:10}
+td{padding:9px 12px;font-size:12px;border-bottom:1px solid rgba(30,38,64,.5)}
+.tag{font-size:10px;padding:2px 6px;border-radius:4px;font-weight:600;display:inline-block}
+.tag-fijo{background:rgba(46,207,168,.15);color:var(--c)}
+.tag-rot{background:rgba(247,163,79,.15);color:var(--w)}
+.tag-pend{background:rgba(79,142,247,.15);color:var(--a)}
+.tag-ok{background:rgba(46,207,168,.15);color:var(--c)}
+.tag-rej{background:rgba(247,95,95,.15);color:var(--d)}
+.tag-dev{background:rgba(247,163,79,.15);color:var(--w)}
+
+/* SELECTS & INPUTS */
+.pl-sel{padding:8px 12px;background:var(--surface2);border:1px solid var(--border);color:var(--text);
+  border-radius:8px;font-size:13px;font-family:inherit}
+.pl-sel:focus{outline:none;border-color:var(--w)}
+.turno-sel{padding:3px 4px;background:var(--surface2);border:1px solid var(--border);color:var(--text);
+  border-radius:4px;font-size:10px;font-family:inherit;min-width:70px}
+.turno-sel:focus{outline:none;border-color:var(--w)}
+
+/* BUTTONS */
+.btn-primary{padding:9px 18px;border-radius:10px;border:none;font-family:inherit;font-weight:600;font-size:12px;
+  cursor:pointer;background:linear-gradient(135deg,var(--a),var(--b));color:#fff;transition:opacity .2s}
+.btn-primary:hover{opacity:.85}
+.btn-secondary{padding:9px 18px;border-radius:10px;border:1px solid var(--border);font-family:inherit;font-weight:600;
+  font-size:12px;cursor:pointer;background:var(--surface2);color:var(--text);transition:all .2s}
+.btn-secondary:hover{border-color:var(--a)}
+.btn-approve{padding:6px 12px;border-radius:6px;border:none;font-family:inherit;font-weight:600;font-size:11px;
+  cursor:pointer;background:rgba(46,207,168,.2);color:var(--c);transition:opacity .2s}
+.btn-reject{padding:6px 12px;border-radius:6px;border:none;font-family:inherit;font-weight:600;font-size:11px;
+  cursor:pointer;background:rgba(247,95,95,.2);color:var(--d);transition:opacity .2s}
+.btn-return{padding:6px 12px;border-radius:6px;border:none;font-family:inherit;font-weight:600;font-size:11px;
+  cursor:pointer;background:rgba(247,163,79,.2);color:var(--w);transition:opacity .2s}
+
+/* FILTER BAR */
+.filter-bar{display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap;align-items:center}
+.filter-item{display:flex;gap:8px;align-items:center}
+.filter-label{font-size:12px;font-weight:600;color:var(--mid);text-transform:uppercase}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;padding:14px 20px;border-radius:12px;
+  background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;
+  box-shadow:0 8px 32px rgba(0,0,0,.4);transform:translateY(100px);opacity:0;
+  transition:all .3s ease;z-index:999;font-weight:500}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.success{border-color:rgba(46,207,168,.4)}
+.toast.error{border-color:rgba(247,95,95,.4)}
+
+/* ANIMATIONS */
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* RESPONSIVE */
+@media(max-width:600px){
+  .lcard{margin:16px;padding:32px 24px;width:auto}
+  .topbar{padding:0 12px;flex-wrap:wrap;height:auto;padding:8px 12px;gap:8px}
+  .navtabs{overflow-x:auto}
+  .content{padding:16px}
+  .filter-bar{flex-direction:column;align-items:stretch}
+  .kgrid{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════ LOGIN ═══════════════════ -->
+<div id="login">
+  <div class="lcard">
+    <div class="llogo">
+      <div class="llogo-icon">🕐</div>
+      <h1>Planificación <span>Horaria</span></h1>
+    </div>
+    <h2>Bienvenido/a</h2>
+    <p>Ingresá con tu usuario y contraseña</p>
+    <div style="display:grid;gap:12px;margin-bottom:20px">
+      <div class="fg">
+        <label>Usuario</label>
+        <input type="text" id="inp-user" placeholder="Tu nombre y apellido" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <div class="fg">
+        <label>Contraseña</label>
+        <input type="password" id="inp-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <div id="login-error" style="display:none;color:var(--d);font-size:12px;background:rgba(247,95,95,.1);border:1px solid rgba(247,95,95,.25);border-radius:8px;padding:10px 12px"></div>
+    </div>
+    <button class="lbtn" onclick="doLogin()">Ingresar →</button>
+    <p style="text-align:center;margin-top:14px;font-size:11px;color:var(--dim)">¿Problemas para ingresar? Contactá a RRHH</p>
+  </div>
+</div>
+
+<!-- ═══════════════════ LOADING ═══════════════════ -->
+<div id="loading">
+  <div class="spinner"></div>
+  <p style="color:var(--mid);font-size:14px">Cargando datos…</p>
+</div>
+
+<!-- ═══════════════════ APP ═══════════════════ -->
+<div id="app">
+  <div class="topbar">
+    <div class="tlogo"><div class="dot"></div>Planificación <span style="color:var(--w)">Horaria</span></div>
+    <div class="navtabs" id="navtabs"></div>
+    <div class="tright">
+      <span id="rbadge" class="rbadge"></span>
+      <button class="xbtn" onclick="doLogout()">Salir</button>
+    </div>
+  </div>
+  <div class="content" id="main-content">
+
+    <!-- ── TAB: PLANIFICACIÓN (Carga) ── -->
+    <div id="sec-planificacion" class="sec">
+      <div class="sh">
+        <div>
+          <h2>📋 Carga de Horarios</h2>
+          <p>Asigná turnos a los empleados de tu sector</p>
+        </div>
+      </div>
+
+      <div class="filter-bar">
+        <div class="filter-item">
+          <span class="filter-label">Semana del:</span>
+          <input type="date" id="pl-fecha" class="pl-sel" onchange="onFechaChange()">
+          <span id="pl-semana-label" style="font-size:12px;color:var(--mid);font-weight:500"></span>
+        </div>
+        <div class="filter-item">
+          <span class="filter-label">Sector:</span>
+          <select id="pl-sector" class="pl-sel">
+            <option value="">Cargando...</option>
+          </select>
+        </div>
+        <div class="filter-item">
+          <span class="filter-label">Tarea:</span>
+          <select id="pl-tarea" class="pl-sel">
+            <option value="">Seleccionar sector</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="kgrid">
+        <div class="kcard"><div class="kl">Total empleados</div><div class="kv" id="pl-k1">0</div></div>
+        <div class="kcard"><div class="kl">Fijos</div><div class="kv" id="pl-k2">0</div></div>
+        <div class="kcard"><div class="kl">Rotativos</div><div class="kv" id="pl-k3">0</div></div>
+        <div class="kcard"><div class="kl">Total horas</div><div class="kv" id="pl-k4">0</div></div>
+      </div>
+
+      <div class="tbl-wrap">
+        <div class="tbl-head">
+          <h3>Empleados</h3>
+          <span id="pl-count">0 empleados</span>
+        </div>
+        <div class="tbl-scroll">
+          <table>
+            <thead>
+              <tr id="pl-thead">
+                <th>Legajo</th><th>Nombre</th><th>Tipo</th><th>Conv.</th>
+                <th>Lun</th><th>Mar</th><th>Mié</th><th>Jue</th><th>Vie</th><th>Sáb</th><th>Dom</th>
+                <th>Hs</th><th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="pl-body">
+              <tr><td colspan="13" style="text-align:center;padding:24px;color:var(--dim)">Seleccioná sector y tarea para ver empleados</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <button class="btn-primary" onclick="plValidarYEnviar()">✅ Validar y enviar a RH</button>
+        <button class="btn-secondary" onclick="plGuardarBorrador()">💾 Guardar borrador</button>
+      </div>
+
+      <!-- Validación feedback -->
+      <div id="pl-validacion" style="display:none;margin-top:16px;padding:16px;border-radius:12px;background:var(--surface);border:1px solid var(--border)"></div>
+    </div>
+
+    <!-- ── TAB: APROBACIONES (solo RH/Admin) ── -->
+    <div id="sec-aprobaciones" class="sec">
+      <div class="sh">
+        <div>
+          <h2>✅ Centro de Aprobaciones</h2>
+          <p>Revisá y aprobá las planificaciones enviadas por los supervisores</p>
+        </div>
+      </div>
+
+      <div class="filter-bar">
+        <div class="filter-item">
+          <span class="filter-label">Estado:</span>
+          <select id="apr-estado" class="pl-sel" onchange="aprFiltrar()">
+            <option value="">Todos</option>
+            <option value="PENDIENTE" selected>Pendientes</option>
+            <option value="APROBADO">Aprobados</option>
+            <option value="RECHAZADO">Rechazados</option>
+            <option value="DEVUELTO">Devueltos</option>
+          </select>
+        </div>
+        <div class="filter-item">
+          <span class="filter-label">Sector:</span>
+          <select id="apr-sector" class="pl-sel" onchange="aprFiltrar()">
+            <option value="">Todos</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="kgrid">
+        <div class="kcard"><div class="kl">Pendientes</div><div class="kv" id="apr-k1" style="color:var(--a)">0</div></div>
+        <div class="kcard"><div class="kl">Aprobadas</div><div class="kv" id="apr-k2" style="color:var(--c)">0</div></div>
+        <div class="kcard"><div class="kl">Rechazadas</div><div class="kv" id="apr-k3" style="color:var(--d)">0</div></div>
+        <div class="kcard"><div class="kl">Devueltas</div><div class="kv" id="apr-k4" style="color:var(--w)">0</div></div>
+      </div>
+
+      <div class="tbl-wrap">
+        <div class="tbl-head">
+          <h3>Planificaciones</h3>
+          <span id="apr-count">0 registros</span>
+        </div>
+        <div class="tbl-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th><th>Fecha</th><th>Supervisor</th><th>Sector</th><th>Período</th>
+                <th>Empleados</th><th>Estado</th><th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="apr-body">
+              <tr><td colspan="8" style="text-align:center;padding:24px;color:var(--dim)">Cargando planificaciones…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast" class="toast"></div>
+
+<!-- ═══════════════════ JAVASCRIPT ═══════════════════ -->
+<script>
+// ─── CONFIG ──────────────────────────────────────────
+const USERS_URL = "https://script.google.com/macros/s/AKfycbxmQBrIe-bBFRidksFzWTx2JYf-LrVv7pGKnZdNmoFyOc3PqagjwNq6vavd6sKeQF4vGg/exec";
+const DATA_URL  = "https://script.google.com/macros/s/AKfycby9nJR5GZ3_1ZVm6HOMJBTF6vA8FOn_ioaL1rE7kOJbpKm_rCd4xcGR4yIgKdOSrjwvKQ/exec";
+
+const EMBEDDED_USERS = [
+  {nombre:"Aiello Nicolas",contrasena:"Rh2026",rol:"admin",sector:"",sucursal:""},
+  {nombre:"Chazarreta Mauro",contrasena:"Depo2026",rol:"supervisor",sector:"DEPOSITO",sucursal:"La Plata"},
+  {nombre:"Gonzalez Miguel",contrasena:"Rh2026",rol:"admin",sector:"",sucursal:""}
+];
+
+const PL_ROLES = {
+  supervisor: {label:'Supervisor',  badge:'bs', tabs:['Planificación']},
+  analyst:    {label:'Analista RRHH',badge:'ba', tabs:['Planificación','Aprobaciones']},
+  admin:      {label:'Administrador',badge:'bd', tabs:['Planificación','Aprobaciones']},
+};
+
+// ─── STATE ───────────────────────────────────────────
+let users = [];
+let currentUser = null;
+let role = null;
+let plEmpleados = [];
+let plTurnos = [];
+let plPlanificaciones = [];
+
+// ─── LOGIN ───────────────────────────────────────────
+async function doLogin(){
+  const userVal = (document.getElementById('inp-user').value||'').trim().toLowerCase();
+  const passVal = (document.getElementById('inp-pass').value||'').trim();
+  const errEl = document.getElementById('login-error');
+  errEl.style.display='none';
+
+  if(!userVal||!passVal){
+    errEl.style.display='block';
+    errEl.textContent='❌ Completá usuario y contraseña';
+    return;
+  }
+
+  document.getElementById('login').style.display='none';
+  document.getElementById('loading').style.display='flex';
+
+  await loadUsers();
+
+  const found = users.find(u =>
+    (u.nombre||'').trim().toLowerCase() === userVal &&
+    (u.contrasena||'').trim() === passVal
+  );
+
+  if(!found){
+    document.getElementById('loading').style.display='none';
+    document.getElementById('login').style.display='flex';
+    errEl.style.display='block';
+    errEl.textContent='❌ Usuario o contraseña incorrectos';
+    return;
+  }
+
+  currentUser = found;
+  role = (found.rol||'analyst').trim().toLowerCase();
+
+  // Verificar que el rol tiene acceso a planificación
+  if(!PL_ROLES[role]){
+    document.getElementById('loading').style.display='none';
+    document.getElementById('login').style.display='flex';
+    errEl.style.display='block';
+    errEl.textContent='❌ Tu rol no tiene acceso a Planificación Horaria';
+    return;
+  }
+
+  console.log(`🔑 Login: ${found.nombre} | rol: ${role} | sector: "${found.sector}"`);
+
+  // Cargar datos de empleados y turnos
+  await loadPlanData();
+
+  document.getElementById('loading').style.display='none';
+  document.getElementById('app').style.display='flex';
+  buildApp();
+}
+
+async function loadUsers(){
+  try {
+    const res = await fetch(USERS_URL + "?sheet=Usuarios");
+    if(res.ok){
+      const data = await res.json();
+      if(data && data.length > 0){
+        users = data.map(u => ({
+          nombre:     String(u['Usuario']||u['usuario']||'').trim(),
+          contrasena: String(u['Contraseña']||u['contrasena']||u['Contrasena']||'').trim(),
+          nombreReal: String(u['Nombre']||u['nombre']||'').trim(),
+          rol:        String(u['Rol']||u['rol']||'analyst').trim().toLowerCase(),
+          sector:     String(u['Sector']||u['sector']||'').trim(),
+          sucursal:   String(u['Sucursal']||u['sucursal']||'').trim(),
+        }));
+        console.log("✅ Usuarios en vivo:", users.length);
+        return;
+      }
+    }
+  } catch(e){ console.warn("Users fetch failed:", e.message); }
+  users = EMBEDDED_USERS;
+  console.log("✅ Usuarios embebidos:", users.length);
+}
+
+async function loadPlanData(){
+  try {
+    console.log('🚀 Cargando empleados (mod35071)...');
+    const r1 = await fetch(DATA_URL + '?sheet=mod35071');
+    const d1 = await r1.json();
+    console.log('✅ Empleados recibidos:', d1.length);
+
+    plEmpleados = d1.map(e => ({
+      legajo:   String(e.Legajo || '').trim(),
+      nombre:   e.Nombre || '',
+      sector:   String(e.Sector || '').trim(),
+      tarea:    String(e.Tarea || '').trim(),
+      horario:  String(e.HORARIO || '').trim(),
+      tipo:     String(e.HORARIO || '').toLowerCase() === 'rotativo' ? 'ROTATIVO' : 'FIJO',
+      convenio: String(e.Convenio || '').trim(),
+      ubicacion:String(e['Ubicación'] || e.Ubicacion || '').trim(),
+    })).filter(e => e.legajo && e.nombre && e.sector);
+
+    console.log('✅ Empleados procesados:', plEmpleados.length);
+
+    console.log('🚀 Cargando turnos...');
+    const r2 = await fetch(DATA_URL + '?sheet=Turnos');
+    const d2 = await r2.json();
+    plTurnos = d2.map(t => ({
+      codigo: String(t.Codigo || t.codigo || '').trim(),
+      descripcion: String(t.Descripcion || t.descripcion || '').trim(),
+    })).filter(t => t.codigo);
+    console.log('✅ Turnos:', plTurnos.length);
+
+  } catch(e){
+    console.error('❌ Error cargando datos:', e);
+    showToast('Error cargando datos: ' + e.message, 'error');
+  }
+
+  // Intentar cargar planificaciones existentes
+  try {
+    const r3 = await fetch(DATA_URL + '?sheet=Planificacion');
+    const d3 = await r3.json();
+    if(d3 && Array.isArray(d3)){
+      plPlanificaciones = d3;
+      console.log('✅ Planificaciones:', plPlanificaciones.length);
+    }
+  } catch(e){
+    console.warn('Planificaciones no disponibles aún:', e.message);
+    plPlanificaciones = [];
+  }
+}
+
+function doLogout(){
+  currentUser = null;
+  role = null;
+  document.getElementById('app').style.display='none';
+  document.getElementById('login').style.display='flex';
+  document.getElementById('inp-user').value='';
+  document.getElementById('inp-pass').value='';
+  document.getElementById('login-error').style.display='none';
+}
+
+// ─── BUILD APP ───────────────────────────────────────
+function buildApp(){
+  const r = PL_ROLES[role];
+  const b = document.getElementById('rbadge');
+  const userName = currentUser ? (currentUser.nombreReal || currentUser.nombre || r.label) : r.label;
+  b.textContent = userName;
+  b.className = 'rbadge ' + r.badge;
+
+  // Build tabs
+  const nav = document.getElementById('navtabs');
+  nav.innerHTML = r.tabs.map((t,i) =>
+    `<button class="ntab ${i===0?'active':''}" onclick="switchTab(this,'${t}')">${t}</button>`
+  ).join('');
+
+  // Setup date: ajustar al lunes de esta semana
+  setFechaAlLunes(new Date());
+
+  // Populate sectors
+  populateSectors();
+
+  // Wire up sector/tarea change
+  document.getElementById('pl-sector').onchange = onSectorChange;
+  document.getElementById('pl-tarea').onchange = onTareaChange;
+
+  // Show first tab
+  renderTab(r.tabs[0]);
+}
+
+function switchTab(btn, tabName){
+  document.querySelectorAll('.ntab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTab(tabName);
+}
+
+// ─── FECHAS ──────────────────────────────────────────
+let semanaFechas = []; // Array con las 7 fechas de la semana (Date objects)
+
+function setFechaAlLunes(fecha){
+  // Ajustar al lunes de esa semana
+  const day = fecha.getDay(); // 0=Dom, 1=Lun...
+  const diff = day === 0 ? -6 : 1 - day; // si es domingo, ir 6 días atrás
+  const lunes = new Date(fecha);
+  lunes.setDate(fecha.getDate() + diff);
+  
+  document.getElementById('pl-fecha').value = formatDateInput(lunes);
+  calcularSemana(lunes);
+}
+
+function onFechaChange(){
+  const val = document.getElementById('pl-fecha').value;
+  if(!val) return;
+  const parts = val.split('-');
+  const fecha = new Date(parts[0], parts[1]-1, parts[2]);
+  setFechaAlLunes(fecha);
+  
+  // Re-renderizar tabla si hay sector seleccionado
+  const sector = document.getElementById('pl-sector').value;
+  const tarea = document.getElementById('pl-tarea').value;
+  if(sector) renderEmpleados(sector, tarea);
+}
+
+function calcularSemana(lunes){
+  semanaFechas = [];
+  for(let i = 0; i < 7; i++){
+    const d = new Date(lunes);
+    d.setDate(lunes.getDate() + i);
+    semanaFechas.push(d);
+  }
+  updateHeaders();
+  
+  // Label "Lun 07/07 al Dom 13/07"
+  const desde = formatDateShort(semanaFechas[0]);
+  const hasta = formatDateShort(semanaFechas[6]);
+  document.getElementById('pl-semana-label').textContent = `(${desde} al ${hasta})`;
+}
+
+function updateHeaders(){
+  const diasNombres = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+  const tr = document.getElementById('pl-thead');
+  tr.innerHTML = '<th>Legajo</th><th>Nombre</th><th>Tipo</th><th>Conv.</th>' +
+    semanaFechas.map((f, i) => 
+      `<th>${diasNombres[i]}<br><span style="font-weight:400;font-size:9px;color:var(--mid)">${formatDateShort(f)}</span></th>`
+    ).join('') +
+    '<th>Hs</th><th>Estado</th>';
+}
+
+function formatDateInput(d){
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function formatDateShort(d){
+  return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0');
+}
+
+function renderTab(tabName){
+  document.querySelectorAll('.sec').forEach(s => s.classList.remove('active'));
+  if(tabName === 'Planificación'){
+    document.getElementById('sec-planificacion').classList.add('active');
+  } else if(tabName === 'Aprobaciones'){
+    document.getElementById('sec-aprobaciones').classList.add('active');
+    renderAprobaciones();
+  }
+}
+
+// ─── PLANIFICACIÓN (Carga) ───────────────────────────
+function populateSectors(){
+  let emps = plEmpleados;
+
+  // Si es supervisor, filtrar solo su sector
+  if(role === 'supervisor' && currentUser.sector){
+    emps = emps.filter(e => e.sector.toUpperCase() === currentUser.sector.toUpperCase());
+  }
+
+  const secs = [...new Set(emps.map(e => e.sector))].sort();
+  const sel = document.getElementById('pl-sector');
+  sel.innerHTML = '<option value="">Seleccionar…</option>';
+  secs.forEach(s => {
+    const o = document.createElement('option');
+    o.value = s; o.textContent = s;
+    sel.appendChild(o);
+  });
+
+  // Si supervisor con un solo sector, auto-seleccionar
+  if(role === 'supervisor' && secs.length === 1){
+    sel.value = secs[0];
+    onSectorChange();
+  }
+
+  // También llenar el filtro de aprobaciones
+  const aprSel = document.getElementById('apr-sector');
+  if(aprSel){
+    const allSecs = [...new Set(plEmpleados.map(e => e.sector))].sort();
+    aprSel.innerHTML = '<option value="">Todos</option>';
+    allSecs.forEach(s => {
+      const o = document.createElement('option');
+      o.value = s; o.textContent = s;
+      aprSel.appendChild(o);
+    });
+  }
+}
+
+function onSectorChange(){
+  const sector = document.getElementById('pl-sector').value;
+  const tareaEl = document.getElementById('pl-tarea');
+
+  if(!sector){
+    tareaEl.innerHTML = '<option value="">Seleccionar sector</option>';
+    clearTable();
+    return;
+  }
+
+  let emps = plEmpleados.filter(e => e.sector === sector);
+  const tareas = [...new Set(emps.map(e => e.tarea))].sort();
+
+  tareaEl.innerHTML = '<option value="">Todas las tareas</option>';
+  tareas.forEach(t => {
+    const o = document.createElement('option');
+    o.value = t; o.textContent = t;
+    tareaEl.appendChild(o);
+  });
+
+  // Si solo hay una tarea, auto-seleccionar
+  if(tareas.length === 1){
+    tareaEl.value = tareas[0];
+    onTareaChange();
+  } else {
+    // Mostrar todos los empleados del sector
+    renderEmpleados(sector, '');
+  }
+}
+
+function onTareaChange(){
+  const sector = document.getElementById('pl-sector').value;
+  const tarea = document.getElementById('pl-tarea').value;
+  renderEmpleados(sector, tarea);
+}
+
+function renderEmpleados(sector, tarea){
+  if(!sector){ clearTable(); return; }
+
+  let emps = plEmpleados.filter(e => e.sector === sector);
+  if(tarea) emps = emps.filter(e => e.tarea === tarea);
+
+  // Separar y ordenar: ROTATIVOS primero, luego FIJOS
+  const rotativos = emps.filter(e => e.tipo === 'ROTATIVO').sort((a,b) => a.nombre.localeCompare(b.nombre));
+  const fijos = emps.filter(e => e.tipo === 'FIJO').sort((a,b) => a.nombre.localeCompare(b.nombre));
+
+  document.getElementById('pl-k1').textContent = emps.length;
+  document.getElementById('pl-k2').textContent = fijos.length;
+  document.getElementById('pl-k3').textContent = rotativos.length;
+  document.getElementById('pl-k4').textContent = '—';
+  document.getElementById('pl-count').textContent = emps.length + ' empleados';
+
+  // Build turno options con formato legible
+  const opts = '<option value="">--</option>' +
+    '<option value="FRANCO">FRANCO</option>' +
+    '<option value="F-COMP">F-COMP</option>' +
+    plTurnos.map(t => `<option value="${t.codigo}">${codeToDisplay(t.codigo)}</option>`).join('');
+
+  const body = document.getElementById('pl-body');
+  body.innerHTML = '';
+
+  if(emps.length === 0){
+    body.innerHTML = '<tr><td colspan="13" style="text-align:center;padding:24px;color:var(--dim)">No hay empleados para este filtro</td></tr>';
+    return;
+  }
+
+  let totalHsGeneral = 0;
+
+  // ── ROTATIVOS (primero, son la prioridad) ──
+  if(rotativos.length > 0){
+    // Encabezado de grupo
+    const sepRot = document.createElement('tr');
+    sepRot.innerHTML = `<td colspan="13" style="padding:10px 12px;background:rgba(247,163,79,.08);border-bottom:1px solid rgba(247,163,79,.2);font-size:12px;font-weight:700;color:var(--w)">
+      🔄 ROTATIVOS — ${rotativos.length} empleados (requieren carga)
+    </td>`;
+    body.appendChild(sepRot);
+
+    rotativos.forEach(e => {
+      const tr = buildEmpleadoRow(e, opts);
+      body.appendChild(tr);
+    });
+  }
+
+  // ── FIJOS (después, ya precargados) ──
+  if(fijos.length > 0){
+    const sepFijo = document.createElement('tr');
+    sepFijo.innerHTML = `<td colspan="13" style="padding:10px 12px;background:rgba(46,207,168,.08);border-bottom:1px solid rgba(46,207,168,.2);font-size:12px;font-weight:700;color:var(--c)">
+      📌 FIJOS — ${fijos.length} empleados (precargados, modificar solo si hay cambios)
+    </td>`;
+    body.appendChild(sepFijo);
+
+    fijos.forEach(e => {
+      const {tr, hs} = buildEmpleadoRowFijo(e, opts);
+      totalHsGeneral += hs;
+      body.appendChild(tr);
+    });
+  }
+
+  // Actualizar total general
+  document.getElementById('pl-k4').textContent = totalHsGeneral > 0 ? totalHsGeneral.toFixed(0) : '0';
+}
+
+// Construir fila de empleado ROTATIVO (vacío, para cargar)
+function buildEmpleadoRow(e, opts){
+  const tr = document.createElement('tr');
+  tr.dataset.legajo = e.legajo;
+  tr.dataset.tipo = 'ROTATIVO';
+
+  let convLabel = getConvLabel(e.convenio);
+
+  let cells = `
+    <td>${e.legajo}</td>
+    <td style="max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${e.nombre}">${e.nombre}</td>
+    <td><span class="tag tag-rot">ROTATIVO</span></td>
+    <td style="font-size:10px;color:var(--dim)">${convLabel}</td>
+  `;
+
+  const dias = ['lun','mar','mie','jue','vie','sab','dom'];
+  dias.forEach(d => {
+    cells += `<td><select class="turno-sel" data-dia="${d}" onchange="calcHoras(this)">${opts}</select></td>`;
+  });
+
+  cells += `<td style="text-align:center;font-weight:700;font-size:11px" class="hs-total">0</td>`;
+  cells += `<td><span class="tag tag-pend" style="font-size:9px">PENDIENTE</span></td>`;
+
+  tr.innerHTML = cells;
+  return tr;
+}
+
+// Construir fila de empleado FIJO (precargado con horario)
+function buildEmpleadoRowFijo(e, opts){
+  const tr = document.createElement('tr');
+  tr.dataset.legajo = e.legajo;
+  tr.dataset.tipo = 'FIJO';
+
+  const conv = (e.convenio || '').toLowerCase();
+  let convLabel = getConvLabel(e.convenio);
+  const esCamionero = conv.includes('camionero');
+
+  let fijoCode = '';
+  let fijoCodeSab = '';
+  if(e.horario){
+    fijoCode = horarioToCode(e.horario);
+    if(esCamionero && fijoCode){
+      fijoCodeSab = calcMedioTurno(fijoCode);
+    }
+  }
+
+  let cells = `
+    <td>${e.legajo}</td>
+    <td style="max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${e.nombre}">${e.nombre}</td>
+    <td><span class="tag tag-fijo">FIJO</span></td>
+    <td style="font-size:10px;color:var(--dim)">${convLabel}</td>
+  `;
+
+  // 7 días con precarga según convenio
+  const dias = ['lun','mar','mie','jue','vie','sab','dom'];
+  const valoresOriginales = []; // Para tracking de cambios
+
+  dias.forEach(d => {
+    let selOpts = opts;
+    let valorOriginal = '';
+
+    if(fijoCode){
+      if(d === 'dom'){
+        valorOriginal = 'FRANCO';
+        selOpts = selOpts.replace('value="FRANCO"', 'value="FRANCO" selected');
+      } else if(d === 'sab' && esCamionero && fijoCodeSab){
+        valorOriginal = fijoCodeSab;
+        const medioDisplay = codeToDisplay(fijoCodeSab);
+        if(!selOpts.includes(`value="${fijoCodeSab}"`)){
+          selOpts += `<option value="${fijoCodeSab}" selected>${medioDisplay}</option>`;
+        } else {
+          selOpts = selOpts.replace(`value="${fijoCodeSab}"`, `value="${fijoCodeSab}" selected`);
+        }
+      } else {
+        valorOriginal = fijoCode;
+        selOpts = selOpts.replace(
+          `value="${fijoCode}"`,
+          `value="${fijoCode}" selected`
+        );
+      }
+    }
+    valoresOriginales.push(valorOriginal);
+    cells += `<td><select class="turno-sel" data-dia="${d}" data-original="${valorOriginal}" onchange="calcHoras(this);marcarCambioFijo(this)">${selOpts}</select></td>`;
+  });
+
+  // Calcular horas iniciales
+  let hsIniciales = 0;
+  if(fijoCode){
+    const hsDia = calcHorasTurno(fijoCode);
+    if(esCamionero){
+      hsIniciales = (hsDia * 5) + calcHorasTurno(fijoCodeSab);
+    } else {
+      hsIniciales = hsDia * 6;
+    }
+  }
+
+  cells += `<td style="text-align:center;font-weight:700;font-size:11px" class="hs-total">${hsIniciales > 0 ? hsIniciales.toFixed(0) : '0'}</td>`;
+  cells += `<td><span class="tag tag-fijo estado-tag" style="font-size:9px">SIN CAMBIOS</span></td>`;
+
+  tr.innerHTML = cells;
+  return {tr, hs: hsIniciales};
+}
+
+// Detectar si un FIJO fue modificado respecto a su horario original
+function marcarCambioFijo(sel){
+  const tr = sel.closest('tr');
+  if(tr.dataset.tipo !== 'FIJO') return;
+
+  const selects = tr.querySelectorAll('.turno-sel');
+  let hayCambio = false;
+  selects.forEach(s => {
+    const original = s.dataset.original || '';
+    if(s.value !== original) hayCambio = true;
+  });
+
+  const estadoTag = tr.querySelector('.estado-tag');
+  if(hayCambio){
+    estadoTag.textContent = 'MODIFICADO';
+    estadoTag.className = 'tag tag-dev estado-tag';
+    estadoTag.style.fontSize = '9px';
+  } else {
+    estadoTag.textContent = 'SIN CAMBIOS';
+    estadoTag.className = 'tag tag-fijo estado-tag';
+    estadoTag.style.fontSize = '9px';
+  }
+}
+
+function getConvLabel(convenio){
+  const conv = (convenio || '').toLowerCase();
+  if(conv.includes('comercio')) return 'COM';
+  if(conv.includes('camionero')) return 'CAM';
+  if(conv.includes('fuera')) return 'FDC';
+  return '—';
+}
+
+// Calcular medio turno (misma hora de entrada + 4hs) para sábados camioneros
+// "06001400" → "06001000"
+function calcMedioTurno(codigo){
+  if(!codigo || codigo.length !== 8) return '';
+  const h1 = parseInt(codigo.substring(0,2));
+  const m1 = parseInt(codigo.substring(2,4));
+  let minFin = (h1 * 60 + m1) + 240; // +4 horas
+  const h2 = Math.floor(minFin / 60) % 24;
+  const m2 = minFin % 60;
+  return codigo.substring(0,4) + String(h2).padStart(2,'0') + String(m2).padStart(2,'0');
+}
+
+// Convertir horario texto → código turno
+// "06.00 a 14.00" → "06001400"
+// "14:00 a 22:00" → "14002200"
+// "6.00 a 14.00"  → "06001400"
+function horarioToCode(horario){
+  if(!horario || horario.toLowerCase() === 'rotativo') return '';
+  // Extraer las dos horas del formato "HH.MM a HH.MM" o "HH:MM a HH:MM"
+  const match = horario.match(/(\d{1,2})[.:](\d{2})\s*a\s*(\d{1,2})[.:](\d{2})/i);
+  if(!match) return '';
+  const h1 = match[1].padStart(2,'0');
+  const m1 = match[2];
+  const h2 = match[3].padStart(2,'0');
+  const m2 = match[4];
+  return h1 + m1 + h2 + m2;
+}
+
+// Convertir código turno → formato legible para mostrar
+// "06001400" → "06:00 a 14:00"
+function codeToDisplay(codigo){
+  if(!codigo || codigo.length !== 8 || isNaN(codigo)) return codigo;
+  return codigo.substring(0,2) + ':' + codigo.substring(2,4) + ' a ' + codigo.substring(4,6) + ':' + codigo.substring(6,8);
+}
+
+function clearTable(){
+  document.getElementById('pl-k1').textContent = '0';
+  document.getElementById('pl-k2').textContent = '0';
+  document.getElementById('pl-k3').textContent = '0';
+  document.getElementById('pl-k4').textContent = '0';
+  document.getElementById('pl-count').textContent = '0 empleados';
+  document.getElementById('pl-body').innerHTML = '<tr><td colspan="13" style="text-align:center;padding:24px;color:var(--dim)">Seleccioná sector y tarea</td></tr>';
+}
+
+// Calcular horas de un turno código HHMMHHMM
+function calcHorasTurno(codigo){
+  if(!codigo || codigo === 'FRANCO' || codigo === 'F-COMP') return 0;
+  if(codigo.length !== 8 || isNaN(codigo)) return 0;
+  const h1 = parseInt(codigo.substring(0,2));
+  const m1 = parseInt(codigo.substring(2,4));
+  const h2 = parseInt(codigo.substring(4,6));
+  const m2 = parseInt(codigo.substring(6,8));
+  let inicio = h1 * 60 + m1;
+  let fin = h2 * 60 + m2;
+  if(fin <= inicio) fin += 24 * 60; // turno nocturno
+  return (fin - inicio) / 60;
+}
+
+function calcHoras(sel){
+  const tr = sel.closest('tr');
+  const selects = tr.querySelectorAll('.turno-sel');
+  let total = 0;
+  selects.forEach(s => {
+    total += calcHorasTurno(s.value);
+  });
+  tr.querySelector('.hs-total').textContent = total > 0 ? total.toFixed(0) : '0';
+
+  // Recalcular total general
+  let grandTotal = 0;
+  document.querySelectorAll('#pl-body .hs-total').forEach(el => {
+    grandTotal += parseFloat(el.textContent) || 0;
+  });
+  document.getElementById('pl-k4').textContent = grandTotal > 0 ? grandTotal.toFixed(0) : '0';
+}
+
+// ─── VALIDACIÓN ──────────────────────────────────────
+function plValidarYEnviar(){
+  const rows = document.querySelectorAll('#pl-body tr[data-legajo]');
+  if(rows.length === 0){
+    showToast('No hay empleados cargados para enviar', 'error');
+    return;
+  }
+
+  const errores = [];
+  const warnings = [];
+  let rotativosOk = 0;
+  let fijosModificados = 0;
+
+  rows.forEach(tr => {
+    const legajo = tr.dataset.legajo;
+    const tipo = tr.dataset.tipo;
+    const nombre = tr.children[1].textContent;
+    const selects = tr.querySelectorAll('.turno-sel');
+    const totalHs = parseFloat(tr.querySelector('.hs-total').textContent) || 0;
+
+    if(tipo === 'ROTATIVO'){
+      // ROTATIVOS: verificar que tengan turnos asignados
+      let vacios = 0;
+      selects.forEach(s => { if(!s.value) vacios++; });
+      if(vacios === 7){
+        errores.push(`🔄 ${nombre} (${legajo}): No tiene ningún turno asignado`);
+        return;
+      }
+      if(vacios > 0){
+        warnings.push(`🔄 ${nombre} (${legajo}): Tiene ${vacios} día(s) sin turno`);
+      }
+
+      // Validar horas semanales
+      const convEl = tr.children[3].textContent;
+      let hsEsperadas = 48;
+      if(convEl === 'CAM') hsEsperadas = 44;
+      if(convEl === 'FDC') hsEsperadas = 40;
+      if(totalHs > 0 && totalHs < hsEsperadas * 0.8){
+        warnings.push(`🔄 ${nombre}: ${totalHs}hs (esperadas ~${hsEsperadas}hs)`);
+      }
+      rotativosOk++;
+
+    } else if(tipo === 'FIJO'){
+      // FIJOS: solo incluir si fueron modificados
+      let hayCambio = false;
+      selects.forEach(s => {
+        if(s.value !== (s.dataset.original || '')) hayCambio = true;
+      });
+      if(hayCambio){
+        fijosModificados++;
+      }
+      // FIJOS sin cambios se ignoran (no se envían)
+    }
+  });
+
+  // Mostrar resultado
+  const valDiv = document.getElementById('pl-validacion');
+  valDiv.style.display = 'block';
+  const totalEnviar = rotativosOk + fijosModificados;
+
+  if(errores.length > 0){
+    valDiv.innerHTML = `
+      <div style="color:var(--d);font-weight:700;margin-bottom:8px">❌ Errores (${errores.length})</div>
+      <div style="font-size:12px;color:var(--mid)">${errores.join('<br>')}</div>
+      ${warnings.length > 0 ? `<div style="color:var(--w);font-weight:700;margin-top:12px">⚠️ Advertencias (${warnings.length})</div><div style="font-size:12px;color:var(--mid)">${warnings.join('<br>')}</div>` : ''}
+    `;
+    showToast('Corregí los errores antes de enviar', 'error');
+  } else if(totalEnviar === 0){
+    valDiv.innerHTML = `<div style="color:var(--w);font-weight:700">⚠️ No hay nada para enviar. Cargá turnos a los rotativos o modificá algún fijo.</div>`;
+    showToast('No hay cambios para enviar', 'error');
+  } else {
+    let html = `<div style="color:var(--c);font-weight:700;margin-bottom:8px">✅ Validación correcta</div>`;
+    html += `<div style="font-size:13px;color:var(--text);margin-bottom:8px">Se enviarán: <strong>${rotativosOk}</strong> rotativos + <strong>${fijosModificados}</strong> fijos modificados = <strong>${totalEnviar}</strong> empleados</div>`;
+    if(warnings.length > 0){
+      html += `<div style="color:var(--w);font-weight:700;margin-top:8px">⚠️ Advertencias (${warnings.length})</div><div style="font-size:12px;color:var(--mid)">${warnings.join('<br>')}</div>`;
+    }
+    html += `<div style="margin-top:16px"><button class="btn-primary" onclick="plConfirmarEnvio()">📤 Confirmar envío a RH</button></div>`;
+    valDiv.innerHTML = html;
+    showToast(`Validación OK: ${totalEnviar} empleados listos ✅`, 'success');
+  }
+}
+
+function plConfirmarEnvio(){
+  // Por ahora, mostrar confirmación
+  showToast('📤 Planificación enviada a RH (en desarrollo)', 'success');
+  document.getElementById('pl-validacion').style.display = 'none';
+}
+
+function plGuardarBorrador(){
+  showToast('💾 Borrador guardado (en desarrollo)', 'success');
+}
+
+// ─── APROBACIONES (RH/Admin) ─────────────────────────
+function renderAprobaciones(){
+  const body = document.getElementById('apr-body');
+
+  if(!plPlanificaciones || plPlanificaciones.length === 0){
+    body.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--dim)">No hay planificaciones registradas aún</td></tr>';
+    document.getElementById('apr-k1').textContent = '0';
+    document.getElementById('apr-k2').textContent = '0';
+    document.getElementById('apr-k3').textContent = '0';
+    document.getElementById('apr-k4').textContent = '0';
+    document.getElementById('apr-count').textContent = '0 registros';
+    return;
+  }
+
+  // Filtrar
+  const estadoFiltro = document.getElementById('apr-estado').value;
+  const sectorFiltro = document.getElementById('apr-sector').value;
+
+  let filtered = plPlanificaciones;
+  if(estadoFiltro) filtered = filtered.filter(p => (p.Estado||'') === estadoFiltro);
+  if(sectorFiltro) filtered = filtered.filter(p => (p.Sector||'') === sectorFiltro);
+
+  // KPIs
+  const pend = plPlanificaciones.filter(p => (p.Estado||'') === 'PENDIENTE').length;
+  const aprob = plPlanificaciones.filter(p => (p.Estado||'') === 'APROBADO').length;
+  const rech = plPlanificaciones.filter(p => (p.Estado||'') === 'RECHAZADO').length;
+  const dev = plPlanificaciones.filter(p => (p.Estado||'') === 'DEVUELTO').length;
+  document.getElementById('apr-k1').textContent = pend;
+  document.getElementById('apr-k2').textContent = aprob;
+  document.getElementById('apr-k3').textContent = rech;
+  document.getElementById('apr-k4').textContent = dev;
+  document.getElementById('apr-count').textContent = filtered.length + ' registros';
+
+  if(filtered.length === 0){
+    body.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--dim)">No hay planificaciones con este filtro</td></tr>';
+    return;
+  }
+
+  body.innerHTML = '';
+  filtered.forEach(p => {
+    const estado = p.Estado || 'PENDIENTE';
+    let tagClass = 'tag-pend';
+    if(estado === 'APROBADO') tagClass = 'tag-ok';
+    if(estado === 'RECHAZADO') tagClass = 'tag-rej';
+    if(estado === 'DEVUELTO') tagClass = 'tag-dev';
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="font-size:11px;font-weight:600">${p.ID || '—'}</td>
+      <td>${p.Fecha || '—'}</td>
+      <td>${p.Supervisor || '—'}</td>
+      <td>${p.Sector || '—'}</td>
+      <td>${p.Periodo || '—'}</td>
+      <td style="text-align:center">${p.CantEmpleados || '—'}</td>
+      <td><span class="tag ${tagClass}">${estado}</span></td>
+      <td style="white-space:nowrap">
+        ${estado === 'PENDIENTE' ? `
+          <button class="btn-approve" onclick="aprAccion('${p.ID}','APROBADO')">✅ Aprobar</button>
+          <button class="btn-return" onclick="aprAccion('${p.ID}','DEVUELTO')">↩️ Devolver</button>
+          <button class="btn-reject" onclick="aprAccion('${p.ID}','RECHAZADO')">❌ Rechazar</button>
+        ` : `<span style="font-size:11px;color:var(--dim)">${estado}</span>`}
+      </td>
+    `;
+    body.appendChild(tr);
+  });
+}
+
+function aprFiltrar(){
+  renderAprobaciones();
+}
+
+function aprAccion(id, nuevoEstado){
+  showToast(`${nuevoEstado === 'APROBADO' ? '✅' : nuevoEstado === 'RECHAZADO' ? '❌' : '↩️'} Planificación ${id} → ${nuevoEstado} (en desarrollo)`, 'success');
+}
+
+// ─── TOAST ───────────────────────────────────────────
+function showToast(msg, type){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + (type || '');
+  setTimeout(() => { t.className = 'toast'; }, 3500);
+}
+</script>
+</body>
+</html>
