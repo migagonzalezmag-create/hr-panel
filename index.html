@@ -520,9 +520,9 @@ function calcAntig(fechaStr){
 // ─── BUILD APP ────────────────────────────────────────────────
 const ROLES = {
   analyst:    {label:'Analista RRHH',    badge:'ba', tabs:['Dashboard','Nómina','Sectores','Antigüedad','Ausentismo','Licencias','Academia']},
-  supervisor: {label:'Jefe / Supervisor', badge:'bs', tabs:['Mi Equipo','Ausentismo','Licencias','Academia','Novedades']},
+  supervisor: {label:'Jefe / Supervisor', badge:'bs', tabs:['Nómina','Ausentismo','Licencias','Academia','Novedades']},
   director:   {label:'Dirección',         badge:'bd', tabs:['Ejecutivo','Composición','Ausentismo','Sueldos','Nómina','Negociaciones','Academia']},
-  admin:      {label:'Administrador',     badge:'bd', tabs:['Dashboard','Nómina','Sectores','Antigüedad','Mi Equipo','Novedades','Ejecutivo','Composición','Ausentismo','Licencias','Sueldos','Negociaciones','Academia']},
+  admin:      {label:'Administrador',     badge:'bd', tabs:['Dashboard','Nómina','Sectores','Antigüedad','Novedades','Ejecutivo','Composición','Ausentismo','Licencias','Sueldos','Negociaciones','Academia']},
 };
 
 const TAB_ICONS = {
@@ -718,14 +718,47 @@ function analystDash(el){
 }
 
 function nominaTab(el){
-  const activeEmployees = filterBySucursal(getActiveEmployees());
+  let activeEmployees = filterBySucursal(getActiveEmployees());
   const sucTit = sucursalTitle();
 
+  // Si es supervisor, filtrar por sector y sucursal
+  const isSupervisor = role === 'supervisor';
+  let sectorLabel = '';
+  if(isSupervisor && currentUser){
+    const userSectors = (currentUser.sector||'').split(',').map(s=>s.trim()).filter(Boolean);
+    const userSuc = (currentUser.sucursal||'').trim().toLowerCase();
+    if(userSectors.length > 0){
+      activeEmployees = activeEmployees.filter(e => userSectors.includes((e['Sector']||'').trim()));
+    }
+    if(userSuc){
+      activeEmployees = activeEmployees.filter(e => {
+        const empUbi = String(e['Ubicación']||e['Ubicacion']||'').trim().toLowerCase();
+        return empUbi.includes(userSuc);
+      });
+    }
+    sectorLabel = userSectors.join(' · ') + (currentUser.sucursal ? ' · ' + currentUser.sucursal : '');
+  }
+
+  // KPIs para supervisor
+  const kpisHtml = isSupervisor ? `
+  <div class="kgrid">
+    <div class="kcard ka"><div class="klbl">Total personas</div><div class="kval">${activeEmployees.length}</div></div>
+    <div class="kcard kc"><div class="klbl">Antigüedad promedio</div><div class="kval">${avg(activeEmployees.map(e=>calcAntig(e['Fecha Ingreso']))).toFixed(1)}a</div></div>
+    <div class="kcard kw"><div class="klbl">Horario rotativo</div><div class="kval">${activeEmployees.filter(e=>e['HORARIO']==='ROTATIVO').length}</div></div>
+    <div class="kcard kb"><div class="klbl">Fuera convenio</div><div class="kval">${activeEmployees.filter(e=>e['Convenio']==='Fuera de Convenio').length}</div></div>
+  </div>` : '';
+
+  const titulo = isSupervisor ? 'Mi Equipo' : 'Nómina Completa';
+  const subtitulo = isSupervisor
+    ? `${activeEmployees.length} empleados · ${sectorLabel}`
+    : `${activeEmployees.length} empleados activos${sucTit}${bajas.length>0?' · <span style="color:var(--d)">'+bajas.length+' baja(s) registrada(s)</span>':''}`;
+
   el.innerHTML=`<div class="sec active">
-  <div class="sh"><div><h2>Nómina Completa</h2><p>${activeEmployees.length} empleados activos${sucTit} · ${bajas.length>0?`<span style="color:var(--d)">${bajas.length} baja(s) registrada(s)</span>`:''}</p></div></div>
+  <div class="sh"><div><h2>${titulo}</h2><p>${subtitulo}</p></div></div>
+  ${kpisHtml}
   <div class="tcard">
     <div class="thead">
-      <h3>Plantel Activo</h3>
+      <h3>${isSupervisor ? sectorLabel : 'Plantel Activo'}</h3>
       <input class="sinput" placeholder="Buscar por nombre, legajo, sector..." oninput="filterNom(this.value)" id="nom-search">
     </div>
     <div style="overflow-x:auto">
