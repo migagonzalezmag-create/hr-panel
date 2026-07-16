@@ -936,11 +936,22 @@ function myTeam(el){
     return;
   }
 
-  const team = getActiveEmployees().filter(e => userSectors.includes((e['Sector']||'').trim()));
+  let team = getActiveEmployees().filter(e => userSectors.includes((e['Sector']||'').trim()));
+
+  // Si el supervisor tiene sucursal asignada, filtrar también por ubicación
+  const userSuc = currentUser && currentUser.sucursal ? currentUser.sucursal.trim().toLowerCase() : '';
+  if(userSuc){
+    team = team.filter(e => {
+      const empUbi = String(e['Ubicación']||e['Ubicacion']||'').trim().toLowerCase();
+      return empUbi.includes(userSuc);
+    });
+  }
+
   const sectorLabel = userSectors.length === 1 ? userSectors[0] : userSectors.join(' · ');
+  const sucLabel = userSuc ? ` · ${currentUser.sucursal}` : '';
 
   el.innerHTML=`<div class="sec active">
-  <div class="sh"><div><h2>Mi Equipo</h2><p>${sectorLabel}</p></div></div>
+  <div class="sh"><div><h2>Mi Equipo</h2><p>${sectorLabel}${sucLabel}</p></div></div>
   <div class="kgrid">
     <div class="kcard ka"><div class="klbl">Total personas</div><div class="kval">${team.length}</div></div>
     <div class="kcard kc"><div class="klbl">Antigüedad promedio</div><div class="kval">${avg(team.map(e=>calcAntig(e['Fecha Ingreso']))).toFixed(1)}a</div></div>
