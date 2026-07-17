@@ -9,6 +9,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Planificación Horaria · Nini</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <style>
 :root {
   --bg:#0a0d14; --surface:#111520; --surface2:#161c2d; --border:#1e2640;
@@ -238,10 +239,20 @@ td{padding:9px 12px;font-size:12px;border-bottom:1px solid rgba(30,38,64,.5)}
       </div>
 
       <div class="kgrid">
-        <div class="kcard"><div class="kl">Total empleados</div><div class="kv" id="pl-k1">0</div></div>
-        <div class="kcard"><div class="kl">Fijos</div><div class="kv" id="pl-k2">0</div></div>
-        <div class="kcard"><div class="kl">Rotativos</div><div class="kv" id="pl-k3">0</div></div>
-        <div class="kcard" style="grid-column:span 2"><div class="kl">Distribución por horario (Fijos)</div><div id="pl-k4" style="font-size:12px;color:var(--mid);font-weight:500;margin-top:4px">—</div></div>
+        <div class="kcard" style="border-left:3px solid var(--a)"><div class="kl">Total empleados</div><div class="kv" style="color:var(--a)" id="pl-k1">0</div></div>
+        <div class="kcard" style="border-left:3px solid var(--c)"><div class="kl">Fijos</div><div class="kv" style="color:var(--c)" id="pl-k2">0</div></div>
+        <div class="kcard" style="border-left:3px solid var(--w)"><div class="kl">Rotativos</div><div class="kv" style="color:var(--w)" id="pl-k3">0</div></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">
+          <div style="font-size:11px;color:var(--dim);text-transform:uppercase;margin-bottom:10px;font-weight:600">Distribución por horario</div>
+          <canvas id="pl-chart-horarios" height="160"></canvas>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">
+          <div style="font-size:11px;color:var(--dim);text-transform:uppercase;margin-bottom:10px;font-weight:600">Detalle</div>
+          <div id="pl-horario-detalle" style="font-size:12px;color:var(--mid)">Seleccioná sector para ver distribución</div>
+        </div>
       </div>
 
       <div class="tbl-wrap">
@@ -696,23 +707,29 @@ function renderEmpleados(sector, tarea){
   // KPIs
   document.getElementById('pl-k1').textContent = emps.length;
   document.getElementById('pl-k2').textContent = fijos.length;
-
-  // Desglose de rotativos por horario asignado (si ya tienen planificación previa)
-  // Como los rotativos no tienen horario precargado, mostrar solo la cantidad
   document.getElementById('pl-k3').textContent = rotativos.length;
 
-  // Desglose de FIJOS por horario
-  const horariosFijos = {};
-  fijos.forEach(e => {
-    const h = e.horario || 'Sin horario';
-    horariosFijos[h] = (horariosFijos[h] || 0) + 1;
+  // Distribución por horario (todos los empleados)
+  const horarios = {};
+  emps.forEach(e => {
+    let h = e.tipo === 'ROTATIVO' ? 'ROTATIVO' : (e.horario || 'Sin horario');
+    horarios[h] = (horarios[h] || 0) + 1;
   });
-  const desgloseFijos = Object.entries(horariosFijos)
-    .sort((a,b) => b[1] - a[1])
-    .map(([h, c]) => `${c} de ${h}`)
-    .join(' · ');
 
-  document.getElementById('pl-k4').textContent = desgloseFijos || '—';
+  // Detalle texto
+  const detalleEl = document.getElementById('pl-horario-detalle');
+  const detalleArr = Object.entries(horarios).sort((a,b) => b[1] - a[1]);
+  detalleEl.innerHTML = detalleArr.map(([h, c]) => {
+    const color = h === 'ROTATIVO' ? 'var(--w)' : 'var(--c)';
+    const pct = ((c / emps.length) * 100).toFixed(0);
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)">
+      <span>${h}</span>
+      <span style="font-weight:700;color:${color}">${c} <span style="font-weight:400;color:var(--dim);font-size:10px">(${pct}%)</span></span>
+    </div>`;
+  }).join('');
+
+  // Gráfico de torta
+  renderChartHorarios(detalleArr);
 
   document.getElementById('pl-count').textContent = emps.length + ' empleados';
 
@@ -1372,6 +1389,53 @@ async function aprAccion(id, nuevoEstado){
   } catch(err) {
     showToast('Error: ' + err.message, 'error');
   }
+}
+
+// ─── GRÁFICO DE HORARIOS ─────────────────────────────
+
+let plChartHorarios = null;
+
+function renderChartHorarios(data){
+  const canvas = document.getElementById('pl-chart-horarios');
+  if(!canvas) return;
+
+  // Destruir chart anterior si existe
+  if(plChartHorarios){
+    plChartHorarios.destroy();
+    plChartHorarios = null;
+  }
+
+  const colores = ['#4f8ef7','#2ecfa8','#f7a34f','#7c5cbf','#f75f5f','#5fd4f7','#c7f75f','#f75fa8'];
+
+  plChartHorarios = new Chart(canvas, {
+    type: 'doughnut',
+    data: {
+      labels: data.map(d => d[0]),
+      datasets: [{
+        data: data.map(d => d[1]),
+        backgroundColor: data.map((_, i) => colores[i % colores.length]),
+        borderWidth: 0,
+        hoverOffset: 5
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '55%',
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: {
+            color: '#9ba3bb',
+            font: { size: 10 },
+            padding: 8,
+            boxWidth: 10,
+            boxHeight: 10
+          }
+        }
+      }
+    }
+  });
 }
 
 // ─── ACCIONES RÁPIDAS ────────────────────────────────
