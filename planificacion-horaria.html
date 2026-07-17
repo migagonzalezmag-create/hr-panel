@@ -806,16 +806,80 @@ function buildEmpleadoRow(e, opts){
     <td style="text-align:center"><button onclick="copiarLunesAFila(this)" style="background:none;border:1px solid var(--border);border-radius:4px;color:var(--w);cursor:pointer;font-size:12px;padding:2px 6px" title="Copiar Lunes a toda la semana">→</button></td>
   `;
 
+  // Buscar si ya se envió una planificación para este empleado en esta semana
+  const periodoStr = getPeriodoStr();
+  const estadoPrevio = getEstadoPrevioRotativo(e.legajo, periodoStr);
+  const hayHistorial = estadoPrevio !== null;
+  tr.dataset.hayHistorial = hayHistorial ? '1' : '0';
+
   const dias = ['lun','mar','mie','jue','vie','sab','dom'];
-  dias.forEach(d => {
-    cells += `<td><select class="turno-sel" data-dia="${d}" onchange="calcHoras(this)">${opts}</select></td>`;
+  const diasCap = ['Lun','Mar','Mié','Jue','Vie','Sab','Dom'];
+  dias.forEach((d, i) => {
+    let selOpts = opts;
+    let valorOriginal = '';
+    if(hayHistorial){
+      const val = estadoPrevio[diasCap[i]];
+      if(val){
+        valorOriginal = val;
+        if(!selOpts.includes(`value="${val}"`)){
+          const disp = codeToDisplay(val);
+          selOpts += `<option value="${val}" selected>${disp}</option>`;
+        } else {
+          selOpts = selOpts.replace(`value="${val}"`, `value="${val}" selected`);
+        }
+      }
+    }
+    cells += `<td><select class="turno-sel" data-dia="${d}" data-original="${valorOriginal}" onchange="calcHoras(this);marcarCambioFijo(this)">${selOpts}</select></td>`;
   });
 
-  cells += `<td style="text-align:center;font-weight:700;font-size:11px" class="hs-total">0</td>`;
-  cells += `<td><span class="tag tag-pend" style="font-size:9px">PENDIENTE</span></td>`;
+  // Calcular horas iniciales si hay historial precargado
+  let hsIniciales = 0;
+  if(hayHistorial){
+    diasCap.forEach(dc => {
+      if(estadoPrevio[dc]) hsIniciales += calcHorasTurno(estadoPrevio[dc]);
+    });
+  }
+
+  cells += `<td style="text-align:center;font-weight:700;font-size:11px" class="hs-total">${hsIniciales > 0 ? hsIniciales.toFixed(0) : '0'}</td>`;
+  cells += hayHistorial
+    ? `<td><span class="tag tag-fijo estado-tag" style="font-size:9px">SIN CAMBIOS</span></td>`
+    : `<td><span class="tag tag-pend estado-tag" style="font-size:9px">PENDIENTE</span></td>`;
 
   tr.innerHTML = cells;
   return tr;
+}
+
+// Devuelve string único para identificar la semana actual (ej: "2026-07-06/2026-07-12")
+function getPeriodoStr(){
+  return semanaFechas.length >= 7
+    ? formatDateInput(semanaFechas[0]) + '/' + formatDateInput(semanaFechas[6])
+    : '';
+}
+
+// Busca en plPlanificaciones el último estado enviado para un legajo en una semana puntual.
+// Combina todas las cargas previas de esa semana (día por día) para tener la "foto" más reciente.
+function getEstadoPrevioRotativo(legajo, periodoStr){
+  if(!periodoStr || !plPlanificaciones || plPlanificaciones.length === 0) return null;
+
+  const entradas = plPlanificaciones.filter(p =>
+    String(p.Legajo||'').trim() === String(legajo).trim() &&
+    String(p.Periodo||'').trim() === periodoStr
+  );
+  if(entradas.length === 0) return null;
+
+  // Ordenar cronológicamente por ID (contiene fecha+hora) para aplicar la más reciente al final
+  entradas.sort((a,b) => String(a.ID||'').localeCompare(String(b.ID||'')));
+
+  const diasCap = ['Lun','Mar','Mié','Jue','Vie','Sab','Dom'];
+  const estado = {};
+  entradas.forEach(entrada => {
+    diasCap.forEach(dc => {
+      const val = String(entrada[dc]||'').trim();
+      if(val) estado[dc] = val; // la carga más reciente pisa a la anterior, día por día
+    });
+  });
+
+  return Object.keys(estado).length > 0 ? estado : null;
 }
 
 // Construir fila de empleado FIJO (precargado con horario)
@@ -837,6 +901,26 @@ function buildEmpleadoRowFijo(e, opts){
     }
   }
 
+  // Armar el horario "habitual" (Lun-Dom) según convenio, como punto de partida
+  const dias = ['lun','mar','mie','jue','vie','sab','dom'];
+  const diasCap = ['Lun','Mar','Mié','Jue','Vie','Sab','Dom'];
+  const horarioHabitual = {};
+  dias.forEach((d, i) => {
+    if(!fijoCode){ horarioHabitual[diasCap[i]] = ''; return; }
+    if(d === 'dom') horarioHabitual[diasCap[i]] = 'FRANCO';
+    else if(d === 'sab' && esCamionero && fijoCodeSab) horarioHabitual[diasCap[i]] = fijoCodeSab;
+    else horarioHabitual[diasCap[i]] = fijoCode;
+  });
+
+  // Si ya se envió un cambio puntual para esta semana, ese es el estado real vigente
+  const periodoStr = getPeriodoStr();
+  const estadoPrevio = getEstadoPrevioRotativo(e.legajo, periodoStr);
+  const hayHistorialSemana = estadoPrevio !== null;
+  tr.dataset.hayHistorial = '1'; // FIJO siempre tiene un "original" de referencia (habitual o de la semana)
+
+  // Estado vigente = habitual, pisado por lo que ya se haya enviado esta semana puntual
+  const estadoVigente = Object.assign({}, horarioHabitual, estadoPrevio || {});
+
   let cells = `
     <td>${e.legajo}</td>
     <td style="max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${e.nombre}">${e.nombre}</td>
@@ -845,78 +929,65 @@ function buildEmpleadoRowFijo(e, opts){
     <td style="text-align:center"><button onclick="copiarLunesAFila(this)" style="background:none;border:1px solid var(--border);border-radius:4px;color:var(--c);cursor:pointer;font-size:12px;padding:2px 6px" title="Copiar Lunes a toda la semana">→</button></td>
   `;
 
-  // 7 días con precarga según convenio
-  const dias = ['lun','mar','mie','jue','vie','sab','dom'];
-  const valoresOriginales = []; // Para tracking de cambios
-
-  dias.forEach(d => {
+  dias.forEach((d, i) => {
     let selOpts = opts;
-    let valorOriginal = '';
+    const valorOriginal = estadoVigente[diasCap[i]] || '';
 
-    if(fijoCode){
-      if(d === 'dom'){
-        valorOriginal = 'FRANCO';
-        selOpts = selOpts.replace('value="FRANCO"', 'value="FRANCO" selected');
-      } else if(d === 'sab' && esCamionero && fijoCodeSab){
-        valorOriginal = fijoCodeSab;
-        const medioDisplay = codeToDisplay(fijoCodeSab);
-        if(!selOpts.includes(`value="${fijoCodeSab}"`)){
-          selOpts += `<option value="${fijoCodeSab}" selected>${medioDisplay}</option>`;
-        } else {
-          selOpts = selOpts.replace(`value="${fijoCodeSab}"`, `value="${fijoCodeSab}" selected`);
-        }
+    if(valorOriginal){
+      if(!selOpts.includes(`value="${valorOriginal}"`)){
+        const disp = codeToDisplay(valorOriginal);
+        selOpts += `<option value="${valorOriginal}" selected>${disp}</option>`;
       } else {
-        valorOriginal = fijoCode;
-        selOpts = selOpts.replace(
-          `value="${fijoCode}"`,
-          `value="${fijoCode}" selected`
-        );
+        selOpts = selOpts.replace(`value="${valorOriginal}"`, `value="${valorOriginal}" selected`);
       }
     }
-    valoresOriginales.push(valorOriginal);
     cells += `<td><select class="turno-sel" data-dia="${d}" data-original="${valorOriginal}" onchange="calcHoras(this);marcarCambioFijo(this)">${selOpts}</select></td>`;
   });
 
-  // Calcular horas iniciales
+  // Calcular horas iniciales según el estado vigente
   let hsIniciales = 0;
-  if(fijoCode){
-    const hsDia = calcHorasTurno(fijoCode);
-    if(esCamionero){
-      hsIniciales = (hsDia * 5) + calcHorasTurno(fijoCodeSab);
-    } else {
-      hsIniciales = hsDia * 6;
-    }
-  }
+  diasCap.forEach(dc => {
+    if(estadoVigente[dc]) hsIniciales += calcHorasTurno(estadoVigente[dc]);
+  });
 
   cells += `<td style="text-align:center;font-weight:700;font-size:11px" class="hs-total">${hsIniciales > 0 ? hsIniciales.toFixed(0) : '0'}</td>`;
-  cells += `<td><span class="tag tag-fijo estado-tag" style="font-size:9px">SIN CAMBIOS</span></td>`;
+  cells += hayHistorialSemana
+    ? `<td><span class="tag tag-dev estado-tag" style="font-size:9px">CAMBIO YA ENVIADO</span></td>`
+    : `<td><span class="tag tag-fijo estado-tag" style="font-size:9px">SIN CAMBIOS</span></td>`;
 
   tr.innerHTML = cells;
   return {tr, hs: hsIniciales};
 }
 
-// Detectar si un FIJO fue modificado respecto a su horario original
+// Detecta cambios en cualquier fila (FIJO o ROTATIVO) y actualiza el estado visual
 function marcarCambioFijo(sel){
   const tr = sel.closest('tr');
-  if(tr.dataset.tipo !== 'FIJO') return;
-
   const selects = tr.querySelectorAll('.turno-sel');
+  const hayHistorial = tr.dataset.hayHistorial === '1';
+
   let hayCambio = false;
+  let hayAlgoCargado = false;
   selects.forEach(s => {
     const original = s.dataset.original || '';
+    if(s.value) hayAlgoCargado = true;
     if(s.value !== original) hayCambio = true;
   });
 
   const estadoTag = tr.querySelector('.estado-tag');
-  if(hayCambio){
-    estadoTag.textContent = 'MODIFICADO';
+  if(!estadoTag) return;
+
+  if(!hayCambio && !hayHistorial && !hayAlgoCargado){
+    // ROTATIVO nuevo, sin nada cargado todavía
+    estadoTag.textContent = 'PENDIENTE';
+    estadoTag.className = 'tag tag-pend estado-tag';
+  } else if(hayCambio){
+    estadoTag.textContent = hayHistorial ? 'MODIFICADO' : 'A ENVIAR';
     estadoTag.className = 'tag tag-dev estado-tag';
-    estadoTag.style.fontSize = '9px';
   } else {
     estadoTag.textContent = 'SIN CAMBIOS';
     estadoTag.className = 'tag tag-fijo estado-tag';
-    estadoTag.style.fontSize = '9px';
   }
+  estadoTag.style.fontSize = '9px';
 }
 
 function getConvLabel(convenio){
@@ -1009,8 +1080,9 @@ function plValidarYEnviar(){
   }
 
   const warnings = [];
-  let rotativosOk = 0;
-  let rotativosSinCargar = 0;
+  let rotativosNuevos = 0;      // rotativos sin historial, primera carga
+  let rotativosModificados = 0; // rotativos con historial, cambio puntual
+  let rotativosSinTocar = 0;
   let fijosModificados = 0;
 
   rows.forEach(tr => {
@@ -1019,36 +1091,45 @@ function plValidarYEnviar(){
     const nombre = tr.children[1].textContent;
     const selects = tr.querySelectorAll('.turno-sel');
     const totalHs = parseFloat(tr.querySelector('.hs-total').textContent) || 0;
+    const hayHistorial = tr.dataset.hayHistorial === '1';
+
+    let hayCambio = false;
+    let diasCambiados = 0;
+    selects.forEach(s => {
+      if(s.value !== (s.dataset.original || '')){
+        hayCambio = true;
+        diasCambiados++;
+      }
+    });
 
     if(tipo === 'ROTATIVO'){
-      let vacios = 0;
-      let asignados = 0;
-      selects.forEach(s => { if(!s.value) vacios++; else asignados++; });
-
-      if(vacios === 7){
-        // ROTATIVO sin nada cargado → se ignora, no bloquea
-        rotativosSinCargar++;
-        return;
-      }
-      if(vacios > 0){
-        warnings.push(`🔄 ${nombre} (${legajo}): Tiene ${vacios} día(s) sin turno`);
+      if(!hayCambio){
+        rotativosSinTocar++;
+        return; // nada nuevo para este empleado, se omite
       }
 
-      // Validar horas semanales
-      const convEl = tr.children[3].textContent;
-      let hsEsperadas = 48;
-      if(convEl === 'CAM') hsEsperadas = 44;
-      if(convEl === 'FDC') hsEsperadas = 40;
-      if(totalHs > 0 && totalHs < hsEsperadas * 0.8){
-        warnings.push(`🔄 ${nombre}: ${totalHs}hs (esperadas ~${hsEsperadas}hs)`);
+      if(hayHistorial){
+        // Edición puntual sobre una semana ya enviada: solo se manda el/los día(s) tocado(s)
+        rotativosModificados++;
+        warnings.push(`🔄 ${nombre}: cambio en ${diasCambiados} día(s) sobre planificación ya enviada`);
+      } else {
+        // Primera carga de la semana: validar completitud
+        let vacios = 0;
+        selects.forEach(s => { if(!s.value) vacios++; });
+        if(vacios > 0){
+          warnings.push(`🔄 ${nombre} (${legajo}): Tiene ${vacios} día(s) sin turno`);
+        }
+        const convEl = tr.children[3].textContent;
+        let hsEsperadas = 48;
+        if(convEl === 'CAM') hsEsperadas = 44;
+        if(convEl === 'FDC') hsEsperadas = 40;
+        if(totalHs > 0 && totalHs < hsEsperadas * 0.8){
+          warnings.push(`🔄 ${nombre}: ${totalHs}hs (esperadas ~${hsEsperadas}hs)`);
+        }
+        rotativosNuevos++;
       }
-      rotativosOk++;
 
     } else if(tipo === 'FIJO'){
-      let hayCambio = false;
-      selects.forEach(s => {
-        if(s.value !== (s.dataset.original || '')) hayCambio = true;
-      });
       if(hayCambio){
         fijosModificados++;
       }
@@ -1058,24 +1139,25 @@ function plValidarYEnviar(){
   // Mostrar resultado
   const valDiv = document.getElementById('pl-validacion');
   valDiv.style.display = 'block';
-  const totalEnviar = rotativosOk + fijosModificados;
+  const totalEnviar = rotativosNuevos + rotativosModificados + fijosModificados;
 
   if(totalEnviar === 0){
-    valDiv.innerHTML = `<div style="color:var(--w);font-weight:700">⚠️ No hay nada para enviar. Cargá turnos a los rotativos o modificá algún fijo.</div>`;
+    valDiv.innerHTML = `<div style="color:var(--w);font-weight:700">⚠️ No hay nada para enviar. Cargá turnos a los rotativos o modificá algún horario.</div>`;
     showToast('No hay cambios para enviar', 'error');
   } else {
     let html = `<div style="color:var(--c);font-weight:700;margin-bottom:8px">✅ Validación correcta</div>`;
     html += `<div style="font-size:13px;color:var(--text);margin-bottom:8px">`;
-    if(rotativosOk > 0) html += `<strong>${rotativosOk}</strong> rotativo(s) con turnos cargados<br>`;
-    if(fijosModificados > 0) html += `<strong>${fijosModificados}</strong> fijo(s) con cambios de horario<br>`;
-    if(rotativosSinCargar > 0) html += `<span style="color:var(--dim)">${rotativosSinCargar} rotativo(s) sin cargar (se omiten)</span><br>`;
-    html += `Total a enviar: <strong>${totalEnviar}</strong> empleados</div>`;
+    if(rotativosNuevos > 0) html += `<strong>${rotativosNuevos}</strong> rotativo(s) — semana completa (primera carga)<br>`;
+    if(rotativosModificados > 0) html += `<strong>${rotativosModificados}</strong> rotativo(s) — solo el/los día(s) modificado(s)<br>`;
+    if(fijosModificados > 0) html += `<strong>${fijosModificados}</strong> fijo(s) con cambio de horario<br>`;
+    if(rotativosSinTocar > 0) html += `<span style="color:var(--dim)">${rotativosSinTocar} rotativo(s) sin cambios (se omiten)</span><br>`;
+    html += `Total a enviar: <strong>${totalEnviar}</strong> registro(s)</div>`;
     if(warnings.length > 0){
-      html += `<div style="color:var(--w);font-weight:700;margin-top:8px">⚠️ Advertencias (${warnings.length})</div><div style="font-size:12px;color:var(--mid)">${warnings.join('<br>')}</div>`;
+      html += `<div style="color:var(--w);font-weight:700;margin-top:8px">⚠️ Detalle</div><div style="font-size:12px;color:var(--mid)">${warnings.join('<br>')}</div>`;
     }
     html += `<div style="margin-top:16px"><button class="btn-primary" onclick="plConfirmarEnvio()">📤 Confirmar planificación</button></div>`;
     valDiv.innerHTML = html;
-    showToast(`Validación OK: ${totalEnviar} empleados listos ✅`, 'success');
+    showToast(`Validación OK: ${totalEnviar} registro(s) listos ✅`, 'success');
   }
 }
 
@@ -1106,21 +1188,11 @@ async function plConfirmarEnvio(){
     const tipo = tr.dataset.tipo;
     const selects = tr.querySelectorAll('.turno-sel');
 
-    // ROTATIVOS: enviar siempre (que tengan al menos 1 turno)
-    if(tipo === 'ROTATIVO'){
-      let tieneAlgo = false;
-      selects.forEach(s => { if(s.value) tieneAlgo = true; });
-      if(!tieneAlgo) return;
-    }
-
-    // FIJOS: enviar solo si fueron modificados
-    if(tipo === 'FIJO'){
-      let hayCambio = false;
-      selects.forEach(s => {
-        if(s.value !== (s.dataset.original || '')) hayCambio = true;
-      });
-      if(!hayCambio) return;
-    }
+    let hayCambio = false;
+    selects.forEach(s => {
+      if(s.value !== (s.dataset.original || '')) hayCambio = true;
+    });
+    if(!hayCambio) return; // nada para este empleado
 
     // Buscar datos del empleado en plEmpleados
     const legajo = tr.dataset.legajo;
@@ -1135,9 +1207,12 @@ async function plConfirmarEnvio(){
       horarioBase: emp.horario || '',
     };
 
-    // Turnos por día
+    // Regla única: solo se manda el valor de un día si es distinto a lo que ya regía
+    // (el original puede ser el horario habitual, lo último enviado esa semana, o vacío
+    // si es la primera carga). Los días sin cambio quedan vacíos y no se reescriben.
     selects.forEach((s, i) => {
-      fila[dias[i]] = s.value || '';
+      const original = s.dataset.original || '';
+      fila[dias[i]] = (s.value !== original) ? s.value : '';
     });
 
     filas.push(fila);
@@ -1482,12 +1557,8 @@ function copiarLunesAFila(btn){
   // Recalcular horas
   calcHoras(selects[0]);
 
-  // Si es FIJO, marcar cambio
-  if(tr.dataset.tipo === 'FIJO'){
-    selects.forEach(s => {
-      if(typeof marcarCambioFijo === 'function') marcarCambioFijo(s);
-    });
-  }
+  // Actualizar estado visual (MODIFICADO / A ENVIAR / SIN CAMBIOS)
+  marcarCambioFijo(selects[0]);
 }
 
 // Calcular medio turno para camioneros en sábado
