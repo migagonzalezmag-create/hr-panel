@@ -247,7 +247,9 @@ td{padding:9px 12px;font-size:12px;border-bottom:1px solid rgba(30,38,64,.5)}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
         <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">
           <div style="font-size:11px;color:var(--dim);text-transform:uppercase;margin-bottom:10px;font-weight:600">Distribución por horario</div>
-          <canvas id="pl-chart-horarios" height="160"></canvas>
+          <div style="position:relative;height:130px;width:100%">
+            <canvas id="pl-chart-horarios"></canvas>
+          </div>
         </div>
         <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">
           <div style="font-size:11px;color:var(--dim);text-transform:uppercase;margin-bottom:10px;font-weight:600">Detalle</div>
@@ -1424,10 +1426,10 @@ function renderChartHorarios(data){
           position: 'bottom',
           labels: {
             color: '#9ba3bb',
-            font: { size: 10 },
-            padding: 8,
-            boxWidth: 10,
-            boxHeight: 10
+            font: { size: 9 },
+            padding: 6,
+            boxWidth: 8,
+            boxHeight: 8
           }
         }
       }
