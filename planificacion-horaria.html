@@ -259,7 +259,7 @@ td{padding:9px 12px;font-size:12px;border-bottom:1px solid rgba(30,38,64,.5)}
               </tr>
             </thead>
             <tbody id="pl-body">
-              <tr><td colspan="13" style="text-align:center;padding:24px;color:var(--dim)">Seleccioná sector y tarea para ver empleados</td></tr>
+              <tr><td colspan="14" style="text-align:center;padding:24px;color:var(--dim)">Seleccioná sector y tarea para ver empleados</td></tr>
             </tbody>
           </table>
         </div>
@@ -403,7 +403,7 @@ async function doLogin(){
     return;
   }
 
-  console.log(`🔑 Login: ${found.nombre} | rol: ${role} | sector: "${found.sector}"`);
+  console.log(`🔑 Login: ${found.nombre} | rol: ${role} | sector: "${found.sector}" | sucursal: "${found.sucursal}"`);
 
   // Cargar datos de empleados y turnos
   await loadPlanData();
@@ -573,7 +573,7 @@ function calcularSemana(lunes){
 function updateHeaders(){
   const diasNombres = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
   const tr = document.getElementById('pl-thead');
-  tr.innerHTML = '<th>Legajo</th><th>Nombre</th><th>Tipo</th><th>Conv.</th>' +
+  tr.innerHTML = '<th>Legajo</th><th>Nombre</th><th>Tipo</th><th>Conv.</th><th style="width:30px;text-align:center">⚡</th>' +
     semanaFechas.map((f, i) => 
       `<th>${diasNombres[i]}<br><span style="font-weight:400;font-size:9px;color:var(--mid)">${formatDateShort(f)}</span></th>`
     ).join('') +
@@ -602,9 +602,15 @@ function renderTab(tabName){
 function populateSectors(){
   let emps = plEmpleados;
 
-  // Si es supervisor, filtrar solo su sector
-  if(role === 'supervisor' && currentUser.sector){
-    emps = emps.filter(e => e.sector.toUpperCase() === currentUser.sector.toUpperCase());
+  // Si es supervisor, filtrar por sector Y sucursal
+  if(role === 'supervisor'){
+    if(currentUser.sector){
+      emps = emps.filter(e => e.sector.toUpperCase() === currentUser.sector.toUpperCase());
+    }
+    if(currentUser.sucursal){
+      const suc = currentUser.sucursal.toLowerCase();
+      emps = emps.filter(e => e.ubicacion.toLowerCase().includes(suc));
+    }
   }
 
   const secs = [...new Set(emps.map(e => e.sector))].sort();
@@ -697,7 +703,7 @@ function renderEmpleados(sector, tarea){
   body.innerHTML = '';
 
   if(emps.length === 0){
-    body.innerHTML = '<tr><td colspan="13" style="text-align:center;padding:24px;color:var(--dim)">No hay empleados para este filtro</td></tr>';
+    body.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:24px;color:var(--dim)">No hay empleados para este filtro</td></tr>';
     return;
   }
 
@@ -705,12 +711,18 @@ function renderEmpleados(sector, tarea){
 
   // ── ROTATIVOS (primero, son la prioridad) ──
   if(rotativos.length > 0){
-    // Encabezado de grupo
-    const sepRot = document.createElement('tr');
-    sepRot.innerHTML = `<td colspan="13" style="padding:10px 12px;background:rgba(247,163,79,.08);border-bottom:1px solid rgba(247,163,79,.2);font-size:12px;font-weight:700;color:var(--w)">
-      🔄 ROTATIVOS — ${rotativos.length} empleados (requieren carga)
+    // Barra de asignación masiva
+    const barMasiva = document.createElement('tr');
+    barMasiva.innerHTML = `<td colspan="14" style="padding:10px 12px;background:rgba(247,163,79,.08);border-bottom:1px solid rgba(247,163,79,.2)">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <span style="font-size:12px;font-weight:700;color:var(--w)">🔄 ROTATIVOS — ${rotativos.length} empleados</span>
+        <span style="font-size:11px;color:var(--dim)">|</span>
+        <span style="font-size:11px;color:var(--mid)">Asignar a todos:</span>
+        <select id="pl-masivo-turno" class="turno-sel" style="min-width:100px">${opts}</select>
+        <button onclick="aplicarATodosRotativos()" style="padding:4px 12px;border-radius:6px;border:1px solid rgba(247,163,79,.4);background:rgba(247,163,79,.15);color:var(--w);font-family:inherit;font-size:11px;font-weight:600;cursor:pointer">⚡ Aplicar a todos</button>
+      </div>
     </td>`;
-    body.appendChild(sepRot);
+    body.appendChild(barMasiva);
 
     rotativos.forEach(e => {
       const tr = buildEmpleadoRow(e, opts);
@@ -721,7 +733,7 @@ function renderEmpleados(sector, tarea){
   // ── FIJOS (después, ya precargados) ──
   if(fijos.length > 0){
     const sepFijo = document.createElement('tr');
-    sepFijo.innerHTML = `<td colspan="13" style="padding:10px 12px;background:rgba(46,207,168,.08);border-bottom:1px solid rgba(46,207,168,.2);font-size:12px;font-weight:700;color:var(--c)">
+    sepFijo.innerHTML = `<td colspan="14" style="padding:10px 12px;background:rgba(46,207,168,.08);border-bottom:1px solid rgba(46,207,168,.2);font-size:12px;font-weight:700;color:var(--c)">
       📌 FIJOS — ${fijos.length} empleados (precargados, modificar solo si hay cambios)
     </td>`;
     body.appendChild(sepFijo);
@@ -750,6 +762,7 @@ function buildEmpleadoRow(e, opts){
     <td style="max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${e.nombre}">${e.nombre}</td>
     <td><span class="tag tag-rot">ROTATIVO</span></td>
     <td style="font-size:10px;color:var(--dim)">${convLabel}</td>
+    <td style="text-align:center"><button onclick="copiarLunesAFila(this)" style="background:none;border:1px solid var(--border);border-radius:4px;color:var(--w);cursor:pointer;font-size:12px;padding:2px 6px" title="Copiar Lunes a toda la semana">→</button></td>
   `;
 
   const dias = ['lun','mar','mie','jue','vie','sab','dom'];
@@ -788,6 +801,7 @@ function buildEmpleadoRowFijo(e, opts){
     <td style="max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${e.nombre}">${e.nombre}</td>
     <td><span class="tag tag-fijo">FIJO</span></td>
     <td style="font-size:10px;color:var(--dim)">${convLabel}</td>
+    <td style="text-align:center"><button onclick="copiarLunesAFila(this)" style="background:none;border:1px solid var(--border);border-radius:4px;color:var(--c);cursor:pointer;font-size:12px;padding:2px 6px" title="Copiar Lunes a toda la semana">→</button></td>
   `;
 
   // 7 días con precarga según convenio
@@ -913,7 +927,7 @@ function clearTable(){
   document.getElementById('pl-k3').textContent = '0';
   document.getElementById('pl-k4').textContent = '0';
   document.getElementById('pl-count').textContent = '0 empleados';
-  document.getElementById('pl-body').innerHTML = '<tr><td colspan="13" style="text-align:center;padding:24px;color:var(--dim)">Seleccioná sector y tarea</td></tr>';
+  document.getElementById('pl-body').innerHTML = '<tr><td colspan="14" style="text-align:center;padding:24px;color:var(--dim)">Seleccioná sector y tarea</td></tr>';
 }
 
 // Calcular horas de un turno código HHMMHHMM
@@ -1335,6 +1349,96 @@ async function aprAccion(id, nuevoEstado){
   } catch(err) {
     showToast('Error: ' + err.message, 'error');
   }
+}
+
+// ─── ACCIONES RÁPIDAS ────────────────────────────────
+
+// Copiar el turno del Lunes a toda la semana (Lun-Sáb mismo turno, Dom FRANCO)
+function copiarLunesAFila(btn){
+  const tr = btn.closest('tr');
+  const selects = tr.querySelectorAll('.turno-sel');
+  if(selects.length < 7) return;
+
+  const turnoLunes = selects[0].value;
+  if(!turnoLunes){
+    showToast('Primero elegí un turno en el Lunes', 'error');
+    return;
+  }
+
+  // Detectar convenio para saber qué hacer con el sábado
+  const convTd = tr.children[3]; // columna Conv.
+  const convLabel = convTd ? convTd.textContent.trim() : '';
+  const esCamionero = convLabel === 'CAM';
+
+  // Mar a Vie = mismo turno que Lunes
+  for(let i = 1; i <= 4; i++){
+    selects[i].value = turnoLunes;
+  }
+
+  // Sábado: camioneros = medio turno, resto = mismo turno
+  if(esCamionero){
+    const medioTurno = calcMedioTurnoCode(turnoLunes);
+    // Buscar si la opción existe, sino agregarla
+    if(medioTurno && !Array.from(selects[5].options).some(o => o.value === medioTurno)){
+      const opt = document.createElement('option');
+      opt.value = medioTurno;
+      opt.textContent = codeToDisplay(medioTurno);
+      selects[5].appendChild(opt);
+    }
+    selects[5].value = medioTurno || turnoLunes;
+  } else {
+    selects[5].value = turnoLunes;
+  }
+
+  // Domingo = FRANCO
+  selects[6].value = 'FRANCO';
+
+  // Recalcular horas
+  calcHoras(selects[0]);
+
+  // Si es FIJO, marcar cambio
+  if(tr.dataset.tipo === 'FIJO'){
+    selects.forEach(s => {
+      if(typeof marcarCambioFijo === 'function') marcarCambioFijo(s);
+    });
+  }
+}
+
+// Calcular medio turno para camioneros en sábado
+function calcMedioTurnoCode(codigo){
+  if(!codigo || codigo.length !== 8 || isNaN(codigo)) return codigo;
+  var h1 = parseInt(codigo.substring(0,2));
+  var m1 = parseInt(codigo.substring(2,4));
+  var minFin = (h1 * 60 + m1) + 240; // +4 horas
+  var h2 = Math.floor(minFin / 60) % 24;
+  var m2 = minFin % 60;
+  return codigo.substring(0,4) + String(h2).padStart(2,'0') + String(m2).padStart(2,'0');
+}
+
+// Aplicar un turno a TODOS los rotativos
+function aplicarATodosRotativos(){
+  const turno = document.getElementById('pl-masivo-turno').value;
+  if(!turno){
+    showToast('Seleccioná un turno primero', 'error');
+    return;
+  }
+
+  const rows = document.querySelectorAll('#pl-body tr[data-tipo="ROTATIVO"]');
+  if(rows.length === 0){
+    showToast('No hay rotativos para asignar', 'error');
+    return;
+  }
+
+  rows.forEach(tr => {
+    const selects = tr.querySelectorAll('.turno-sel');
+    // Poner el turno en el Lunes
+    if(selects.length >= 1) selects[0].value = turno;
+    // Usar copiarLunesAFila para completar la semana
+    const btn = tr.querySelector('button');
+    if(btn) copiarLunesAFila(btn);
+  });
+
+  showToast(`⚡ Turno ${codeToDisplay(turno)} aplicado a ${rows.length} rotativos`, 'success');
 }
 
 // ─── GENERAR ARCHIVO PARA EL SISTEMA ─────────────────
