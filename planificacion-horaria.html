@@ -241,7 +241,7 @@ td{padding:9px 12px;font-size:12px;border-bottom:1px solid rgba(30,38,64,.5)}
         <div class="kcard"><div class="kl">Total empleados</div><div class="kv" id="pl-k1">0</div></div>
         <div class="kcard"><div class="kl">Fijos</div><div class="kv" id="pl-k2">0</div></div>
         <div class="kcard"><div class="kl">Rotativos</div><div class="kv" id="pl-k3">0</div></div>
-        <div class="kcard"><div class="kl">Total horas</div><div class="kv" id="pl-k4">0</div></div>
+        <div class="kcard" style="grid-column:span 2"><div class="kl">Distribución por horario (Fijos)</div><div id="pl-k4" style="font-size:12px;color:var(--mid);font-weight:500;margin-top:4px">—</div></div>
       </div>
 
       <div class="tbl-wrap">
@@ -683,14 +683,37 @@ function renderEmpleados(sector, tarea){
   let emps = plEmpleados.filter(e => e.sector === sector);
   if(tarea) emps = emps.filter(e => e.tarea === tarea);
 
+  // Filtrar por sucursal si es supervisor
+  if(role === 'supervisor' && currentUser && currentUser.sucursal){
+    const suc = currentUser.sucursal.toLowerCase();
+    emps = emps.filter(e => e.ubicacion.toLowerCase().includes(suc));
+  }
+
   // Separar y ordenar: ROTATIVOS primero, luego FIJOS
   const rotativos = emps.filter(e => e.tipo === 'ROTATIVO').sort((a,b) => a.nombre.localeCompare(b.nombre));
   const fijos = emps.filter(e => e.tipo === 'FIJO').sort((a,b) => a.nombre.localeCompare(b.nombre));
 
+  // KPIs
   document.getElementById('pl-k1').textContent = emps.length;
   document.getElementById('pl-k2').textContent = fijos.length;
+
+  // Desglose de rotativos por horario asignado (si ya tienen planificación previa)
+  // Como los rotativos no tienen horario precargado, mostrar solo la cantidad
   document.getElementById('pl-k3').textContent = rotativos.length;
-  document.getElementById('pl-k4').textContent = '—';
+
+  // Desglose de FIJOS por horario
+  const horariosFijos = {};
+  fijos.forEach(e => {
+    const h = e.horario || 'Sin horario';
+    horariosFijos[h] = (horariosFijos[h] || 0) + 1;
+  });
+  const desgloseFijos = Object.entries(horariosFijos)
+    .sort((a,b) => b[1] - a[1])
+    .map(([h, c]) => `${c} de ${h}`)
+    .join(' · ');
+
+  document.getElementById('pl-k4').textContent = desgloseFijos || '—';
+
   document.getElementById('pl-count').textContent = emps.length + ' empleados';
 
   // Build turno options con formato legible
