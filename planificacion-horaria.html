@@ -786,7 +786,6 @@ function renderEmpleados(sector, tarea){
   }
 
   // Actualizar total general
-  document.getElementById('pl-k4').textContent = totalHsGeneral > 0 ? totalHsGeneral.toFixed(0) : '0';
 }
 
 // Construir fila de empleado ROTATIVO (vacío, para cargar)
@@ -965,7 +964,6 @@ function clearTable(){
   document.getElementById('pl-k1').textContent = '0';
   document.getElementById('pl-k2').textContent = '0';
   document.getElementById('pl-k3').textContent = '0';
-  document.getElementById('pl-k4').textContent = '0';
   document.getElementById('pl-count').textContent = '0 empleados';
   document.getElementById('pl-body').innerHTML = '<tr><td colspan="14" style="text-align:center;padding:24px;color:var(--dim)">Seleccioná sector y tarea</td></tr>';
 }
@@ -998,7 +996,6 @@ function calcHoras(sel){
   document.querySelectorAll('#pl-body .hs-total').forEach(el => {
     grandTotal += parseFloat(el.textContent) || 0;
   });
-  document.getElementById('pl-k4').textContent = grandTotal > 0 ? grandTotal.toFixed(0) : '0';
 }
 
 // ─── VALIDACIÓN ──────────────────────────────────────
