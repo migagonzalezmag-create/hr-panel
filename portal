@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="es" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portal Nini</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="manifest" href="manifest-portal.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/hrnini-192.png">
+<link rel="apple-touch-icon" href="icons/hrnini-192.png">
+<meta name="theme-color" content="#FAF9F7">
+<style>
+:root{
+  --bg:#FAF9F7; --ink:#1A1D29; --ink-dim:#6E7180; --ink-faint:#A6A9B4;
+  --red:#E41D15; --blue:#022F9A; --card:rgba(255,255,255,.72); --card-solid:#ffffff;
+  --border:rgba(26,29,41,.08);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;overflow-x:hidden}
+
+.aurora{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.blob{position:absolute;border-radius:50%;filter:blur(90px);opacity:.35}
+.blob1{width:520px;height:520px;background:var(--red);top:-180px;left:-120px}
+.blob2{width:480px;height:480px;background:var(--blue);top:-100px;right:-160px;opacity:.28}
+.blob3{width:440px;height:440px;background:var(--blue);bottom:-220px;left:30%;opacity:.16}
+
+header{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;
+  padding:28px 48px;max-width:1160px;margin:0 auto}
+.brand{display:flex;align-items:center;gap:12px}
+.brand img{height:34px;width:auto;display:block}
+.brand-label{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--ink-faint);
+  padding-left:12px;border-left:1.5px solid var(--border);letter-spacing:.3px}
+.pill{font-size:12px;font-weight:600;color:var(--ink-dim);background:var(--card-solid);
+  border:1px solid var(--border);padding:7px 14px;border-radius:100px;
+  display:flex;align-items:center;gap:7px;box-shadow:0 2px 10px rgba(32,34,43,.04)}
+.pill .dot{width:6px;height:6px;border-radius:50%;background:#2ECC8F;box-shadow:0 0 0 3px rgba(46,204,143,.18)}
+
+main{position:relative;z-index:1;max-width:1160px;margin:0 auto;padding:52px 48px 90px}
+
+.hero{margin-bottom:56px;max-width:620px}
+.hero .eyebrow{font-size:13px;font-weight:700;color:var(--red);margin-bottom:14px;letter-spacing:.2px}
+.hero h2{font-family:'Syne',sans-serif;font-size:46px;font-weight:800;line-height:1.08;
+  letter-spacing:-1px;margin-bottom:16px}
+.hero p{font-size:16px;color:var(--ink-dim);line-height:1.6;max-width:460px}
+
+.section-title{font-size:13px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;
+  letter-spacing:1px;margin-bottom:18px}
+
+.bento{display:grid;grid-template-columns:repeat(6,1fr);gap:18px;margin-bottom:52px}
+.card{grid-column:span 3;position:relative;background:var(--card);backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:28px;
+  padding:32px;text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:18px;
+  box-shadow:0 4px 24px rgba(32,34,43,.05);transition:transform .3s cubic-bezier(.2,.8,.2,1), box-shadow .3s ease, border-color .3s ease}
+.card:hover{transform:translateY(-5px);box-shadow:0 16px 40px rgba(32,34,43,.10);border-color:rgba(32,34,43,.14)}
+.card:focus-visible{outline:2px solid var(--accent,var(--red));outline-offset:3px}
+
+.card-icon{width:56px;height:56px;border-radius:18px;display:flex;align-items:center;justify-content:center;
+  font-size:26px;background:var(--tint,rgba(231,51,44,.1))}
+.card h3{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;letter-spacing:-.2px}
+.card p{font-size:13.5px;color:var(--ink-dim);line-height:1.55;flex:1}
+.card-cta{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:700;
+  color:var(--accent,var(--red))}
+.card-cta .arrow{transition:transform .25s ease;display:inline-block}
+.card:hover .card-cta .arrow{transform:translateX(4px)}
+
+.card.pending{grid-column:span 6;flex-direction:row;align-items:center;justify-content:space-between;
+  opacity:1;background:transparent;border:1.5px dashed var(--border);box-shadow:none;padding:26px 32px}
+.card.pending:hover{transform:none;box-shadow:none;border-color:rgba(32,34,43,.16)}
+.card.pending .left{display:flex;align-items:center;gap:18px}
+.card.pending .card-icon{width:48px;height:48px;font-size:21px;background:rgba(32,34,43,.05)}
+.card.pending h3{font-size:16px}
+.card.pending p{font-size:12.5px;flex:none}
+.card.pending .badge{font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;
+  letter-spacing:.5px;background:rgba(32,34,43,.05);padding:6px 12px;border-radius:100px;white-space:nowrap}
+
+footer{position:relative;z-index:1;max-width:1160px;margin:0 auto;padding:0 48px 44px;
+  display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--ink-faint)}
+
+@media(max-width:760px){
+  header{padding:20px 22px}
+  main{padding:36px 22px 60px}
+  .hero h2{font-size:32px}
+  .pill span:not(.dot){display:none}
+  .bento{grid-template-columns:1fr}
+  .card{grid-column:span 1}
+  .card.pending{flex-direction:column;align-items:flex-start;gap:14px}
+  footer{padding:0 22px 34px;flex-direction:column;gap:8px;align-items:flex-start}
+}
+</style>
+</head>
+<body>
+
+<div class="aurora">
+  <div class="blob blob1"></div>
+  <div class="blob blob2"></div>
+  <div class="blob blob3"></div>
+</div>
+
+<header>
+  <div class="brand">
+    <img src="nini-logo.png" alt="Nini Mayorista">
+    <span class="brand-label">Portal</span>
+  </div>
+  <div class="pill"><span class="dot"></span><span>Todos los sistemas en línea</span></div>
+</header>
+
+<main>
+  <div class="hero">
+    <div class="eyebrow">Ricardo Nini S.A.</div>
+    <h2>¿A dónde querés<br>entrar hoy?</h2>
+    <p>Elegí un sistema para empezar. Cada aplicación tiene su propio inicio de sesión.</p>
+  </div>
+
+  <div class="section-title">Sistemas disponibles</div>
+  <div class="bento">
+
+    <a class="card" href="index.html" style="--accent:var(--blue);--tint:rgba(27,63,160,.1)">
+      <div class="card-icon">📊</div>
+      <div>
+        <h3>HRnini</h3>
+        <p>Panel de Recursos Humanos: nómina, ausentismo, licencias, sueldos y negociaciones.</p>
+      </div>
+      <span class="card-cta">Ingresar <span class="arrow">→</span></span>
+    </a>
+
+    <a class="card" href="planificacion-horaria.html" style="--accent:var(--red);--tint:rgba(231,51,44,.1)">
+      <div class="card-icon">🕐</div>
+      <div>
+        <h3>Planificación Horaria</h3>
+        <p>Carga semanal de turnos para personal fijo y rotativo, por sector y sucursal.</p>
+      </div>
+      <span class="card-cta">Ingresar <span class="arrow">→</span></span>
+    </a>
+
+    <div class="card pending">
+      <div class="left">
+        <div class="card-icon">🎓</div>
+        <div>
+          <h3>Academia Nini</h3>
+          <p>Certificados y capacitaciones del personal</p>
+        </div>
+      </div>
+      <span class="badge">Próximamente</span>
+    </div>
+
+  </div>
+</main>
+
+<footer>
+  <span>Portal Nini · Uso interno</span>
+  <span>Ricardo Nini S.A.</span>
+</footer>
+
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw-hrnini.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
