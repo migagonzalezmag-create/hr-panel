@@ -490,13 +490,20 @@ function splitCSVLine(line){
 function parseFecha(fechaStr){
   if(!fechaStr) return null;
   const s = String(fechaStr).trim();
+  // Formato ISO con hora: 2026-07-13T00:00:00.000Z (lo que suele mandar Google Sheets)
+  // Se toma SOLO la parte de fecha, ignorando hora/zona horaria, para evitar que
+  // se corra un día al convertir a la zona horaria local (Argentina UTC-3)
+  const isoConHora = s.match(/^(\d{4})-(\d{2})-(\d{2})T/);
+  if(isoConHora){
+    return new Date(parseInt(isoConHora[1]), parseInt(isoConHora[2])-1, parseInt(isoConHora[3]));
+  }
   // Formato ISO: 1987-07-01
   if(s.match(/^\d{4}-\d{2}-\d{2}$/)){
     const [y,m,d] = s.split('-').map(Number);
     return new Date(y, m-1, d);
   }
   // Formato dd/mm/yyyy: 01/07/1987
-  if(s.match(/^\d{2}\/\d{2}\/\d{4}$/)){
+  if(s.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)){
     const [d,m,y] = s.split('/').map(Number);
     return new Date(y, m-1, d);
   }
@@ -1767,7 +1774,7 @@ function verPerfilLicencia(legajo){
   const ultimos = (emp.ultimos||[]);
   const ultimosHTML = ultimos.map(r=>`
     <tr>
-      <td style="font-size:11px;color:var(--dim)">${r.fecha?new Date(r.fecha).toLocaleDateString('es-AR'):'-'}</td>
+      <td style="font-size:11px;color:var(--dim)">${r.fecha?formatFecha(r.fecha):'-'}</td>
       <td><span class="pill pgy">${r.motivo}</span></td>
       <td style="font-weight:700;color:var(--a)">${r.dias}d</td>
       <td style="font-size:11px;color:var(--mid);max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.obs||'-'}</td>
@@ -2003,7 +2010,7 @@ function procesarLicenciasRaw(raw, legajosFilter){
     const dias=parseInt(r['dias']||r['Dias']||0)||0;
     const mot=String(r['motivo']||r['Motivo']||'Sin dato').trim();
     const fechaStr=r['fecha inicio']||r['Fecha Inicio']||'';
-    const anio=fechaStr?new Date(fechaStr).getFullYear():0;
+    const anio=fechaStr?(parseFecha(fechaStr)?.getFullYear()||0):0;
     const obs=String(r['Observacion']||r['observacion']||'').trim().slice(0,100);
     totalRegistros++; totalDias+=dias;
     porMotivo[mot]=(porMotivo[mot]||0)+dias;
@@ -2014,7 +2021,7 @@ function procesarLicenciasRaw(raw, legajosFilter){
     porEmp[leg].ultimos.push({fecha:fechaStr,dias,motivo:mot,obs});
   });
   Object.values(porEmp).forEach(e => {
-    e.ultimos.sort((a,b) => new Date(b.fecha) - new Date(a.fecha));
+    e.ultimos.sort((a,b) => (parseFecha(b.fecha)||0) - (parseFecha(a.fecha)||0));
   });
   return {
     empleados:Object.values(porEmp),
