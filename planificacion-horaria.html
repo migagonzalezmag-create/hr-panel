@@ -126,6 +126,12 @@ td{padding:9px 12px;font-size:12px;border-bottom:1px solid rgba(30,38,64,.5)}
 .turno-sel{padding:3px 4px;background:var(--surface2);border:1px solid var(--border);color:var(--text);
   border-radius:4px;font-size:10px;font-family:inherit;min-width:70px}
 .turno-sel:focus{outline:none;border-color:var(--w)}
+.credito-input{width:100%;margin-top:3px;padding:2px 4px;background:rgba(124,92,191,.1);
+  border:1px solid rgba(124,92,191,.3);color:var(--b);border-radius:4px;font-size:9px;
+  font-family:inherit;text-align:center}
+.credito-input:focus{outline:none;border-color:var(--b)}
+.credito-input::placeholder{color:rgba(124,92,191,.5)}
+.credito-badge{font-size:8px;color:var(--b);font-weight:700}
 
 /* BUTTONS */
 .btn-primary{padding:9px 18px;border-radius:10px;border:none;font-family:inherit;font-weight:600;font-size:12px;
@@ -251,7 +257,7 @@ td{padding:9px 12px;font-size:12px;border-bottom:1px solid rgba(30,38,64,.5)}
         <div class="kcard" style="border-left:3px solid var(--w)"><div class="kl">Rotativos</div><div class="kv" style="color:var(--w)" id="pl-k3">0</div></div>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
         <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">
           <div style="font-size:11px;color:var(--dim);text-transform:uppercase;margin-bottom:10px;font-weight:600">Distribución por horario</div>
           <div style="position:relative;height:130px;width:100%">
@@ -261,6 +267,16 @@ td{padding:9px 12px;font-size:12px;border-bottom:1px solid rgba(30,38,64,.5)}
         <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">
           <div style="font-size:11px;color:var(--dim);text-transform:uppercase;margin-bottom:10px;font-weight:600">Detalle</div>
           <div id="pl-horario-detalle" style="font-size:12px;color:var(--mid)">Seleccioná sector para ver distribución</div>
+        </div>
+      </div>
+
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:20px;overflow:hidden">
+        <div style="padding:14px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleCobertura()">
+          <div style="font-size:11px;color:var(--dim);text-transform:uppercase;font-weight:600">📊 Cobertura por día y horario — con quién cuenta cada día</div>
+          <span id="pl-cobertura-toggle" style="color:var(--dim);font-size:12px">▼ Ver</span>
+        </div>
+        <div id="pl-cobertura-body" style="display:none;padding:0 16px 16px">
+          <div id="pl-cobertura-contenido" style="font-size:12px;color:var(--mid)">Seleccioná sector para ver cobertura</div>
         </div>
       </div>
 
@@ -285,9 +301,12 @@ td{padding:9px 12px;font-size:12px;border-bottom:1px solid rgba(30,38,64,.5)}
         </div>
       </div>
 
-      <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
         <button class="btn-primary" onclick="plValidarYEnviar()">✅ Enviar planificación</button>
         <button class="btn-secondary" onclick="plGuardarBorrador()">💾 Guardar borrador</button>
+        <button class="btn-secondary" onclick="descargarPlanillaFirma()">🖊️ Planilla para firmar</button>
+        <button class="btn-secondary" onclick="descargarControlCredito()">🕐 Control de horas crédito</button>
+        <span id="pl-credito-total" style="font-size:11px;color:var(--b);font-weight:600"></span>
       </div>
 
       <!-- Validación feedback -->
@@ -795,6 +814,7 @@ function renderEmpleados(sector, tarea){
   }
 
   // Actualizar total general
+  actualizarCobertura();
 }
 
 // Construir fila de empleado ROTATIVO (vacío, para cargar)
@@ -836,7 +856,7 @@ function buildEmpleadoRow(e, opts){
         }
       }
     }
-    cells += `<td><select class="turno-sel" data-dia="${d}" data-original="${valorOriginal}" onchange="calcHoras(this);marcarCambioFijo(this)">${selOpts}</select></td>`;
+    cells += `<td><select class="turno-sel" data-dia="${d}" data-original="${valorOriginal}" onchange="calcHoras(this);marcarCambioFijo(this)">${selOpts}</select><input type="number" class="credito-input" data-dia="${d}" min="0" max="12" step="0.5" placeholder="+hs créd." title="Hora crédito (informativo, no suma al total)" onchange="actualizarTotalCredito()"></td>`;
   });
 
   // Calcular horas iniciales si hay historial precargado
@@ -948,7 +968,7 @@ function buildEmpleadoRowFijo(e, opts){
         selOpts = selOpts.replace(`value="${valorOriginal}"`, `value="${valorOriginal}" selected`);
       }
     }
-    cells += `<td><select class="turno-sel" data-dia="${d}" data-original="${valorOriginal}" onchange="calcHoras(this);marcarCambioFijo(this)">${selOpts}</select></td>`;
+    cells += `<td><select class="turno-sel" data-dia="${d}" data-original="${valorOriginal}" onchange="calcHoras(this);marcarCambioFijo(this)">${selOpts}</select><input type="number" class="credito-input" data-dia="${d}" min="0" max="12" step="0.5" placeholder="+hs créd." title="Hora crédito (informativo, no suma al total)" onchange="actualizarTotalCredito()"></td>`;
   });
 
   // Calcular horas iniciales según el estado vigente
@@ -1076,6 +1096,87 @@ function calcHoras(sel){
   document.querySelectorAll('#pl-body .hs-total').forEach(el => {
     grandTotal += parseFloat(el.textContent) || 0;
   });
+
+  actualizarCobertura();
+}
+
+// ─── COBERTURA POR DÍA Y HORARIO ─────────────────────
+function toggleCobertura(){
+  const body = document.getElementById('pl-cobertura-body');
+  const toggle = document.getElementById('pl-cobertura-toggle');
+  const abierto = body.style.display !== 'none';
+  body.style.display = abierto ? 'none' : 'block';
+  toggle.textContent = abierto ? '▼ Ver' : '▲ Ocultar';
+}
+
+function actualizarCobertura(){
+  const cont = document.getElementById('pl-cobertura-contenido');
+  if(!cont) return;
+
+  const rows = document.querySelectorAll('#pl-body tr[data-legajo]');
+  if(rows.length === 0){
+    cont.innerHTML = 'Seleccioná sector para ver cobertura';
+    return;
+  }
+
+  const diasLabel = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+
+  // cobertura[tipo][codigo] = [cant_lun, cant_mar, ..., cant_dom]
+  const cobertura = { FIJO: {}, ROTATIVO: {} };
+
+  rows.forEach(tr => {
+    const tipo = tr.dataset.tipo;
+    const selects = tr.querySelectorAll('.turno-sel');
+    selects.forEach((s, i) => {
+      const val = s.value;
+      if(!val) return; // sin cargar, no cuenta
+      if(!cobertura[tipo][val]) cobertura[tipo][val] = [0,0,0,0,0,0,0];
+      cobertura[tipo][val][i]++;
+    });
+  });
+
+  function ordenarCodigos(obj){
+    return Object.keys(obj).sort((a,b) => {
+      const aEspecial = (a === 'FRANCO' || a === 'F-COMP');
+      const bEspecial = (b === 'FRANCO' || b === 'F-COMP');
+      if(aEspecial && !bEspecial) return 1;
+      if(!aEspecial && bEspecial) return -1;
+      return a.localeCompare(b);
+    });
+  }
+
+  function tablaHTML(titulo, colorVar, datos){
+    const codigos = ordenarCodigos(datos);
+    if(codigos.length === 0){
+      return `<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:700;color:${colorVar};text-transform:uppercase;margin-bottom:6px">${titulo}</div><div style="font-size:11px;color:var(--dim)">Sin datos cargados</div></div>`;
+    }
+    let html = `<div style="margin-bottom:14px">
+      <div style="font-size:11px;font-weight:700;color:${colorVar};text-transform:uppercase;margin-bottom:6px">${titulo}</div>
+      <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
+      <thead><tr>
+        <th style="text-align:left;padding:5px 8px;font-size:10px;color:var(--dim);border-bottom:1px solid var(--border)">Horario</th>
+        ${diasLabel.map(d => `<th style="padding:5px 6px;font-size:10px;color:var(--dim);border-bottom:1px solid var(--border);text-align:center">${d}</th>`).join('')}
+        <th style="padding:5px 6px;font-size:10px;color:var(--dim);border-bottom:1px solid var(--border);text-align:center">Total</th>
+      </tr></thead><tbody>`;
+
+    codigos.forEach(cod => {
+      const conteos = datos[cod];
+      const total = conteos.reduce((a,b) => a+b, 0);
+      const label = (cod === 'FRANCO' || cod === 'F-COMP') ? cod : codeToDisplay(cod);
+      html += `<tr>
+        <td style="padding:5px 8px;font-size:11px;color:var(--text);white-space:nowrap">${label}</td>
+        ${conteos.map(c => `<td style="padding:5px 6px;font-size:11.5px;text-align:center;font-weight:${c>0?'700':'400'};color:${c>0?'var(--text)':'var(--dim)'}">${c>0?c:'—'}</td>`).join('')}
+        <td style="padding:5px 6px;font-size:11.5px;text-align:center;font-weight:700;color:${colorVar}">${total}</td>
+      </tr>`;
+    });
+
+    html += '</tbody></table></div></div>';
+    return html;
+  }
+
+  cont.innerHTML =
+    tablaHTML('📌 Fijos', 'var(--c)', cobertura.FIJO) +
+    tablaHTML('🔄 Rotativos', 'var(--w)', cobertura.ROTATIVO);
 }
 
 // ─── VALIDACIÓN ──────────────────────────────────────
@@ -1607,6 +1708,139 @@ function aplicarATodosRotativos(){
 
 // ─── GENERAR ARCHIVO PARA EL SISTEMA ─────────────────
 // Formato: Legajo | Código | Fecha (sin encabezados, Excel)
+// ─── HORA CRÉDITO ─────────────────────────────────────
+function actualizarTotalCredito(){
+  const inputs = document.querySelectorAll('#pl-body .credito-input');
+  let total = 0;
+  let cantidad = 0;
+  inputs.forEach(inp => {
+    const v = parseFloat(inp.value);
+    if(v > 0){ total += v; cantidad++; }
+  });
+  const el = document.getElementById('pl-credito-total');
+  if(el){
+    el.textContent = total > 0
+      ? `🕐 ${total}hs de crédito cargadas en ${cantidad} día(s)`
+      : '';
+  }
+}
+
+// Texto para mostrar un día: horario + anotación de crédito si corresponde
+function formatDisplayConCredito(codigo, credito){
+  if(!codigo) return '';
+  let texto = (codigo === 'FRANCO' || codigo === 'F-COMP') ? codigo : codeToDisplay(codigo);
+  if(credito && parseFloat(credito) > 0){
+    texto += ` (+${credito}hs crédito)`;
+  }
+  return texto;
+}
+
+// ─── PLANILLA PARA FIRMAR (formato papel, para el sector) ─────
+function descargarPlanillaFirma(){
+  const rows = document.querySelectorAll('#pl-body tr[data-legajo]');
+  if(rows.length === 0){
+    showToast('No hay empleados cargados', 'error');
+    return;
+  }
+  if(semanaFechas.length < 7){
+    showToast('Seleccioná una semana primero', 'error');
+    return;
+  }
+
+  const dias = ['lun','mar','mie','jue','vie','sab','dom'];
+  const diasLetra = ['L','M','M','J','V','S','D']; // Lunes a Domingo, según semana de la herramienta
+
+  // Encabezado: LEGAJO | NOMBRE | 7 fechas | FIRMA | ACLARACION
+  let htmlRows = '<tr>';
+  htmlRows += '<th style="background:#1A1D29;color:#fff;padding:6px 10px">LEGAJO</th>';
+  htmlRows += '<th style="background:#1A1D29;color:#fff;padding:6px 10px">NOMBRE</th>';
+  semanaFechas.forEach(f => {
+    const fechaStr = String(f.getDate()).padStart(2,'0') + '/' + String(f.getMonth()+1).padStart(2,'0') + '/' + f.getFullYear();
+    htmlRows += `<th style="background:#1A1D29;color:#fff;padding:6px 10px">${fechaStr}</th>`;
+  });
+  htmlRows += '<th style="background:#1A1D29;color:#fff;padding:6px 10px">FIRMA</th>';
+  htmlRows += '<th style="background:#1A1D29;color:#fff;padding:6px 10px">ACLARACIÓN</th>';
+  htmlRows += '</tr><tr>';
+  htmlRows += '<td></td><td></td>';
+  diasLetra.forEach(l => { htmlRows += `<td style="text-align:center;font-weight:bold">${l}</td>`; });
+  htmlRows += '<td></td><td></td></tr>';
+
+  let totalFilas = 0;
+
+  rows.forEach(tr => {
+    const legajo = tr.dataset.legajo;
+    const nombre = tr.children[1].textContent.trim();
+    const selects = tr.querySelectorAll('.turno-sel');
+    const creditos = tr.querySelectorAll('.credito-input');
+
+    htmlRows += `<tr><td style="mso-number-format:\\@">${legajo}</td><td>${nombre}</td>`;
+    selects.forEach((s, i) => {
+      const texto = formatDisplayConCredito(s.value, creditos[i] ? creditos[i].value : '');
+      htmlRows += `<td>${texto}</td>`;
+    });
+    htmlRows += '<td></td><td></td></tr>';
+    totalFilas++;
+  });
+
+  const excelHtml = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Planilla</x:Name></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body><table border="1">' + htmlRows + '</table></body></html>';
+
+  const blob = new Blob([excelHtml], {type: 'application/vnd.ms-excel;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'planilla_firmar_' + (semanaFechas[0] ? formatDateInput(semanaFechas[0]) : 'export') + '.xls';
+  a.click();
+
+  showToast(`🖊️ Planilla para firmar generada (${totalFilas} empleados)`, 'success');
+}
+
+// ─── CONTROL DE HORAS CRÉDITO (para tu planilla externa) ─────
+function descargarControlCredito(){
+  const rows = document.querySelectorAll('#pl-body tr[data-legajo]');
+  if(rows.length === 0){
+    showToast('No hay empleados cargados', 'error');
+    return;
+  }
+
+  const dias = ['lun','mar','mie','jue','vie','sab','dom'];
+  let registros = [];
+  let htmlRows = '<tr><th style="background:#022F9A;color:#fff;padding:6px 10px">Legajo</th><th style="background:#022F9A;color:#fff;padding:6px 10px">Nombre</th><th style="background:#022F9A;color:#fff;padding:6px 10px">Fecha</th><th style="background:#022F9A;color:#fff;padding:6px 10px">Horario</th><th style="background:#022F9A;color:#fff;padding:6px 10px">Horas Crédito</th></tr>';
+
+  rows.forEach(tr => {
+    const legajo = tr.dataset.legajo;
+    const nombre = tr.children[1].textContent.trim();
+    const selects = tr.querySelectorAll('.turno-sel');
+    const creditos = tr.querySelectorAll('.credito-input');
+
+    creditos.forEach((inp, i) => {
+      const v = parseFloat(inp.value);
+      if(v > 0){
+        const fecha = semanaFechas[i];
+        const fechaStr = fecha ? String(fecha.getDate()).padStart(2,'0') + '/' + String(fecha.getMonth()+1).padStart(2,'0') + '/' + fecha.getFullYear() : '';
+        const horario = codeToDisplay(selects[i].value);
+        htmlRows += `<tr><td style="mso-number-format:\\@">${legajo}</td><td>${nombre}</td><td style="mso-number-format:\\@">${fechaStr}</td><td>${horario}</td><td>${v}</td></tr>`;
+        registros.push({legajo, fechaStr, v});
+      }
+    });
+  });
+
+  if(registros.length === 0){
+    showToast('No hay horas crédito cargadas para exportar', 'error');
+    return;
+  }
+
+  const excelHtml = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Creditos</x:Name></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body><table border="1">' + htmlRows + '</table></body></html>';
+
+  const blob = new Blob([excelHtml], {type: 'application/vnd.ms-excel;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'control_horas_credito_' + (semanaFechas[0] ? formatDateInput(semanaFechas[0]) : 'export') + '.xls';
+  a.click();
+
+  showToast(`🕐 Control de créditos generado (${registros.length} registros)`, 'success');
+}
+
 function generarArchivoSistema(filas){
   const dias = ['lun','mar','mie','jue','vie','sab','dom'];
   let lineas = [];
