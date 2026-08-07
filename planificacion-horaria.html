@@ -17,6 +17,7 @@
 <meta name="apple-mobile-web-app-title" content="Planificación">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root {
   --bg:#0a0d14; --surface:#111520; --surface2:#161c2d; --border:#1e2640;
@@ -1746,25 +1747,24 @@ function descargarPlanillaFirma(){
     showToast('Seleccioná una semana primero', 'error');
     return;
   }
+  if(typeof XLSX === 'undefined'){
+    showToast('Error: no se pudo cargar el generador de Excel. Revisá tu conexión.', 'error');
+    return;
+  }
 
-  const dias = ['lun','mar','mie','jue','vie','sab','dom'];
   const diasLetra = ['L','M','M','J','V','S','D']; // Lunes a Domingo, según semana de la herramienta
 
-  // Encabezado: LEGAJO | NOMBRE | 7 fechas | FIRMA | ACLARACION
-  let htmlRows = '<tr>';
-  htmlRows += '<th style="background:#1A1D29;color:#fff;padding:6px 10px">LEGAJO</th>';
-  htmlRows += '<th style="background:#1A1D29;color:#fff;padding:6px 10px">NOMBRE</th>';
+  // Fila 1: encabezado con fechas
+  const fila1 = ['LEGAJO', 'NOMBRE'];
   semanaFechas.forEach(f => {
-    const fechaStr = String(f.getDate()).padStart(2,'0') + '/' + String(f.getMonth()+1).padStart(2,'0') + '/' + f.getFullYear();
-    htmlRows += `<th style="background:#1A1D29;color:#fff;padding:6px 10px">${fechaStr}</th>`;
+    fila1.push(String(f.getDate()).padStart(2,'0') + '/' + String(f.getMonth()+1).padStart(2,'0') + '/' + f.getFullYear());
   });
-  htmlRows += '<th style="background:#1A1D29;color:#fff;padding:6px 10px">FIRMA</th>';
-  htmlRows += '<th style="background:#1A1D29;color:#fff;padding:6px 10px">ACLARACIÓN</th>';
-  htmlRows += '</tr><tr>';
-  htmlRows += '<td></td><td></td>';
-  diasLetra.forEach(l => { htmlRows += `<td style="text-align:center;font-weight:bold">${l}</td>`; });
-  htmlRows += '<td></td><td></td></tr>';
+  fila1.push('FIRMA', 'ACLARACIÓN');
 
+  // Fila 2: letra del día
+  const fila2 = ['', '', ...diasLetra, '', ''];
+
+  const aoa = [fila1, fila2];
   let totalFilas = 0;
 
   rows.forEach(tr => {
@@ -1773,23 +1773,31 @@ function descargarPlanillaFirma(){
     const selects = tr.querySelectorAll('.turno-sel');
     const creditos = tr.querySelectorAll('.credito-input');
 
-    htmlRows += `<tr><td style="mso-number-format:\\@">${legajo}</td><td>${nombre}</td>`;
+    const filaEmpleado = [legajo, nombre];
     selects.forEach((s, i) => {
-      const texto = formatDisplayConCredito(s.value, creditos[i] ? creditos[i].value : '');
-      htmlRows += `<td>${texto}</td>`;
+      filaEmpleado.push(formatDisplayConCredito(s.value, creditos[i] ? creditos[i].value : ''));
     });
-    htmlRows += '<td></td><td></td></tr>';
+    filaEmpleado.push('', ''); // FIRMA, ACLARACION en blanco
+    aoa.push(filaEmpleado);
     totalFilas++;
   });
 
-  const excelHtml = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Planilla</x:Name></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body><table border="1">' + htmlRows + '</table></body></html>';
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
 
-  const blob = new Blob([excelHtml], {type: 'application/vnd.ms-excel;charset=utf-8'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'planilla_firmar_' + (semanaFechas[0] ? formatDateInput(semanaFechas[0]) : 'export') + '.xls';
-  a.click();
+  // Anchos de columna
+  ws['!cols'] = [
+    {wch: 9},  // Legajo
+    {wch: 30}, // Nombre
+    {wch: 12},{wch: 12},{wch: 12},{wch: 12},{wch: 12},{wch: 12},{wch: 12}, // 7 días
+    {wch: 16}, // Firma
+    {wch: 20}, // Aclaración
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Planilla');
+
+  const nombreArchivo = 'planilla_firmar_' + (semanaFechas[0] ? formatDateInput(semanaFechas[0]) : 'export') + '.xlsx';
+  XLSX.writeFile(wb, nombreArchivo);
 
   showToast(`🖊️ Planilla para firmar generada (${totalFilas} empleados)`, 'success');
 }
@@ -1801,10 +1809,12 @@ function descargarControlCredito(){
     showToast('No hay empleados cargados', 'error');
     return;
   }
+  if(typeof XLSX === 'undefined'){
+    showToast('Error: no se pudo cargar el generador de Excel. Revisá tu conexión.', 'error');
+    return;
+  }
 
-  const dias = ['lun','mar','mie','jue','vie','sab','dom'];
-  let registros = [];
-  let htmlRows = '<tr><th style="background:#022F9A;color:#fff;padding:6px 10px">Legajo</th><th style="background:#022F9A;color:#fff;padding:6px 10px">Nombre</th><th style="background:#022F9A;color:#fff;padding:6px 10px">Fecha</th><th style="background:#022F9A;color:#fff;padding:6px 10px">Horario</th><th style="background:#022F9A;color:#fff;padding:6px 10px">Horas Crédito</th></tr>';
+  const aoa = [['Legajo', 'Nombre', 'Fecha', 'Horario', 'Horas Crédito']];
 
   rows.forEach(tr => {
     const legajo = tr.dataset.legajo;
@@ -1818,27 +1828,26 @@ function descargarControlCredito(){
         const fecha = semanaFechas[i];
         const fechaStr = fecha ? String(fecha.getDate()).padStart(2,'0') + '/' + String(fecha.getMonth()+1).padStart(2,'0') + '/' + fecha.getFullYear() : '';
         const horario = codeToDisplay(selects[i].value);
-        htmlRows += `<tr><td style="mso-number-format:\\@">${legajo}</td><td>${nombre}</td><td style="mso-number-format:\\@">${fechaStr}</td><td>${horario}</td><td>${v}</td></tr>`;
-        registros.push({legajo, fechaStr, v});
+        aoa.push([legajo, nombre, fechaStr, horario, v]);
       }
     });
   });
 
-  if(registros.length === 0){
+  if(aoa.length === 1){
     showToast('No hay horas crédito cargadas para exportar', 'error');
     return;
   }
 
-  const excelHtml = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Creditos</x:Name></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body><table border="1">' + htmlRows + '</table></body></html>';
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{wch:9},{wch:30},{wch:12},{wch:16},{wch:14}];
 
-  const blob = new Blob([excelHtml], {type: 'application/vnd.ms-excel;charset=utf-8'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'control_horas_credito_' + (semanaFechas[0] ? formatDateInput(semanaFechas[0]) : 'export') + '.xls';
-  a.click();
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Creditos');
 
-  showToast(`🕐 Control de créditos generado (${registros.length} registros)`, 'success');
+  const nombreArchivo = 'control_horas_credito_' + (semanaFechas[0] ? formatDateInput(semanaFechas[0]) : 'export') + '.xlsx';
+  XLSX.writeFile(wb, nombreArchivo);
+
+  showToast(`🕐 Control de créditos generado (${aoa.length - 1} registros)`, 'success');
 }
 
 function generarArchivoSistema(filas){
