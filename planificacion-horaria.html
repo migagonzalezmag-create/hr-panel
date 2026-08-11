@@ -127,12 +127,6 @@ td{padding:9px 12px;font-size:12px;border-bottom:1px solid rgba(30,38,64,.5)}
 .turno-sel{padding:3px 4px;background:var(--surface2);border:1px solid var(--border);color:var(--text);
   border-radius:4px;font-size:10px;font-family:inherit;min-width:70px}
 .turno-sel:focus{outline:none;border-color:var(--w)}
-.credito-input{width:100%;margin-top:3px;padding:2px 4px;background:rgba(124,92,191,.1);
-  border:1px solid rgba(124,92,191,.3);color:var(--b);border-radius:4px;font-size:9px;
-  font-family:inherit;text-align:center}
-.credito-input:focus{outline:none;border-color:var(--b)}
-.credito-input::placeholder{color:rgba(124,92,191,.5)}
-.credito-badge{font-size:8px;color:var(--b);font-weight:700}
 
 /* BUTTONS */
 .btn-primary{padding:9px 18px;border-radius:10px;border:none;font-family:inherit;font-weight:600;font-size:12px;
@@ -306,8 +300,6 @@ td{padding:9px 12px;font-size:12px;border-bottom:1px solid rgba(30,38,64,.5)}
         <button class="btn-primary" onclick="plValidarYEnviar()">✅ Enviar planificación</button>
         <button class="btn-secondary" onclick="plGuardarBorrador()">💾 Guardar borrador</button>
         <button class="btn-secondary" onclick="descargarPlanillaFirma()">🖊️ Planilla para firmar</button>
-        <button class="btn-secondary" onclick="descargarControlCredito()">🕐 Control de horas crédito</button>
-        <span id="pl-credito-total" style="font-size:11px;color:var(--b);font-weight:600"></span>
       </div>
 
       <!-- Validación feedback -->
@@ -857,7 +849,7 @@ function buildEmpleadoRow(e, opts){
         }
       }
     }
-    cells += `<td><select class="turno-sel" data-dia="${d}" data-original="${valorOriginal}" onchange="calcHoras(this);marcarCambioFijo(this)">${selOpts}</select><input type="number" class="credito-input" data-dia="${d}" min="0" max="12" step="0.5" placeholder="+hs créd." title="Hora crédito (informativo, no suma al total)" onchange="actualizarTotalCredito()"></td>`;
+    cells += `<td><select class="turno-sel" data-dia="${d}" data-original="${valorOriginal}" onchange="calcHoras(this);marcarCambioFijo(this)">${selOpts}</select></td>`;
   });
 
   // Calcular horas iniciales si hay historial precargado
@@ -969,7 +961,7 @@ function buildEmpleadoRowFijo(e, opts){
         selOpts = selOpts.replace(`value="${valorOriginal}"`, `value="${valorOriginal}" selected`);
       }
     }
-    cells += `<td><select class="turno-sel" data-dia="${d}" data-original="${valorOriginal}" onchange="calcHoras(this);marcarCambioFijo(this)">${selOpts}</select><input type="number" class="credito-input" data-dia="${d}" min="0" max="12" step="0.5" placeholder="+hs créd." title="Hora crédito (informativo, no suma al total)" onchange="actualizarTotalCredito()"></td>`;
+    cells += `<td><select class="turno-sel" data-dia="${d}" data-original="${valorOriginal}" onchange="calcHoras(this);marcarCambioFijo(this)">${selOpts}</select></td>`;
   });
 
   // Calcular horas iniciales según el estado vigente
@@ -1709,31 +1701,11 @@ function aplicarATodosRotativos(){
 
 // ─── GENERAR ARCHIVO PARA EL SISTEMA ─────────────────
 // Formato: Legajo | Código | Fecha (sin encabezados, Excel)
-// ─── HORA CRÉDITO ─────────────────────────────────────
-function actualizarTotalCredito(){
-  const inputs = document.querySelectorAll('#pl-body .credito-input');
-  let total = 0;
-  let cantidad = 0;
-  inputs.forEach(inp => {
-    const v = parseFloat(inp.value);
-    if(v > 0){ total += v; cantidad++; }
-  });
-  const el = document.getElementById('pl-credito-total');
-  if(el){
-    el.textContent = total > 0
-      ? `🕐 ${total}hs de crédito cargadas en ${cantidad} día(s)`
-      : '';
-  }
-}
 
-// Texto para mostrar un día: horario + anotación de crédito si corresponde
-function formatDisplayConCredito(codigo, credito){
+// Texto para mostrar un día en la planilla para firmar
+function formatDisplayDia(codigo){
   if(!codigo) return '';
-  let texto = (codigo === 'FRANCO' || codigo === 'F-COMP') ? codigo : codeToDisplay(codigo);
-  if(credito && parseFloat(credito) > 0){
-    texto += ` (+${credito}hs crédito)`;
-  }
-  return texto;
+  return (codigo === 'FRANCO' || codigo === 'F-COMP') ? codigo : codeToDisplay(codigo);
 }
 
 // ─── PLANILLA PARA FIRMAR (formato papel, para el sector) ─────
@@ -1771,11 +1743,10 @@ function descargarPlanillaFirma(){
     const legajo = tr.dataset.legajo;
     const nombre = tr.children[1].textContent.trim();
     const selects = tr.querySelectorAll('.turno-sel');
-    const creditos = tr.querySelectorAll('.credito-input');
 
     const filaEmpleado = [legajo, nombre];
-    selects.forEach((s, i) => {
-      filaEmpleado.push(formatDisplayConCredito(s.value, creditos[i] ? creditos[i].value : ''));
+    selects.forEach((s) => {
+      filaEmpleado.push(formatDisplayDia(s.value));
     });
     filaEmpleado.push('', ''); // FIRMA, ACLARACION en blanco
     aoa.push(filaEmpleado);
@@ -1800,54 +1771,6 @@ function descargarPlanillaFirma(){
   XLSX.writeFile(wb, nombreArchivo);
 
   showToast(`🖊️ Planilla para firmar generada (${totalFilas} empleados)`, 'success');
-}
-
-// ─── CONTROL DE HORAS CRÉDITO (para tu planilla externa) ─────
-function descargarControlCredito(){
-  const rows = document.querySelectorAll('#pl-body tr[data-legajo]');
-  if(rows.length === 0){
-    showToast('No hay empleados cargados', 'error');
-    return;
-  }
-  if(typeof XLSX === 'undefined'){
-    showToast('Error: no se pudo cargar el generador de Excel. Revisá tu conexión.', 'error');
-    return;
-  }
-
-  const aoa = [['Legajo', 'Nombre', 'Fecha', 'Horario', 'Horas Crédito']];
-
-  rows.forEach(tr => {
-    const legajo = tr.dataset.legajo;
-    const nombre = tr.children[1].textContent.trim();
-    const selects = tr.querySelectorAll('.turno-sel');
-    const creditos = tr.querySelectorAll('.credito-input');
-
-    creditos.forEach((inp, i) => {
-      const v = parseFloat(inp.value);
-      if(v > 0){
-        const fecha = semanaFechas[i];
-        const fechaStr = fecha ? String(fecha.getDate()).padStart(2,'0') + '/' + String(fecha.getMonth()+1).padStart(2,'0') + '/' + fecha.getFullYear() : '';
-        const horario = codeToDisplay(selects[i].value);
-        aoa.push([legajo, nombre, fechaStr, horario, v]);
-      }
-    });
-  });
-
-  if(aoa.length === 1){
-    showToast('No hay horas crédito cargadas para exportar', 'error');
-    return;
-  }
-
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [{wch:9},{wch:30},{wch:12},{wch:16},{wch:14}];
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Creditos');
-
-  const nombreArchivo = 'control_horas_credito_' + (semanaFechas[0] ? formatDateInput(semanaFechas[0]) : 'export') + '.xlsx';
-  XLSX.writeFile(wb, nombreArchivo);
-
-  showToast(`🕐 Control de créditos generado (${aoa.length - 1} registros)`, 'success');
 }
 
 function generarArchivoSistema(filas){
