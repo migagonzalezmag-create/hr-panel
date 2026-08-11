@@ -749,8 +749,12 @@ function renderEmpleados(sector, tarea){
     </div>`;
   }).join('');
 
-  // Gráfico de torta
-  renderChartHorarios(detalleArr);
+  // Gráfico de torta (protegido: si falla no debe bloquear la lista de empleados)
+  try {
+    renderChartHorarios(detalleArr);
+  } catch(e) {
+    console.warn('No se pudo dibujar el gráfico de distribución:', e.message);
+  }
 
   document.getElementById('pl-count').textContent = emps.length + ' empleados';
 
@@ -1573,6 +1577,13 @@ let plChartHorarios = null;
 function renderChartHorarios(data){
   const canvas = document.getElementById('pl-chart-horarios');
   if(!canvas) return;
+
+  // Si Chart.js no llegó a cargar (por ejemplo, un corte de conexión al CDN),
+  // no seguimos: mostramos un aviso en vez de romper el resto de la pantalla.
+  if(typeof Chart === 'undefined'){
+    canvas.parentElement.innerHTML = '<div style="font-size:11px;color:var(--dim);text-align:center;padding:20px 0">📡 No se pudo cargar el gráfico (revisá tu conexión)</div>';
+    return;
+  }
 
   // Destruir chart anterior si existe
   if(plChartHorarios){
