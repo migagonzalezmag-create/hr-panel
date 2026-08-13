@@ -284,13 +284,13 @@ td{padding:9px 12px;font-size:12px;border-bottom:1px solid rgba(30,38,64,.5)}
           <table>
             <thead>
               <tr id="pl-thead">
-                <th>Legajo</th><th>Nombre</th><th>Tipo</th><th>Conv.</th>
+                <th>Legajo</th><th>Nombre</th><th>Tarea</th><th>Tipo</th><th>Conv.</th>
                 <th>Lun</th><th>Mar</th><th>Mié</th><th>Jue</th><th>Vie</th><th>Sáb</th><th>Dom</th>
                 <th>Hs</th><th>Estado</th>
               </tr>
             </thead>
             <tbody id="pl-body">
-              <tr><td colspan="14" style="text-align:center;padding:24px;color:var(--dim)">Seleccioná sector y tarea para ver empleados</td></tr>
+              <tr><td colspan="15" style="text-align:center;padding:24px;color:var(--dim)">Seleccioná sector y tarea para ver empleados</td></tr>
             </tbody>
           </table>
         </div>
@@ -605,7 +605,7 @@ function calcularSemana(lunes){
 function updateHeaders(){
   const diasNombres = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
   const tr = document.getElementById('pl-thead');
-  tr.innerHTML = '<th>Legajo</th><th>Nombre</th><th>Tipo</th><th>Conv.</th><th style="width:30px;text-align:center">⚡</th>' +
+  tr.innerHTML = '<th>Legajo</th><th>Nombre</th><th>Tarea</th><th>Tipo</th><th>Conv.</th><th style="width:30px;text-align:center">⚡</th>' +
     semanaFechas.map((f, i) => 
       `<th>${diasNombres[i]}<br><span style="font-weight:400;font-size:9px;color:var(--mid)">${formatDateShort(f)}</span></th>`
     ).join('') +
@@ -768,7 +768,7 @@ function renderEmpleados(sector, tarea){
   body.innerHTML = '';
 
   if(emps.length === 0){
-    body.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:24px;color:var(--dim)">No hay empleados para este filtro</td></tr>';
+    body.innerHTML = '<tr><td colspan="15" style="text-align:center;padding:24px;color:var(--dim)">No hay empleados para este filtro</td></tr>';
     return;
   }
 
@@ -778,7 +778,7 @@ function renderEmpleados(sector, tarea){
   if(rotativos.length > 0){
     // Barra de asignación masiva
     const barMasiva = document.createElement('tr');
-    barMasiva.innerHTML = `<td colspan="14" style="padding:10px 12px;background:rgba(247,163,79,.08);border-bottom:1px solid rgba(247,163,79,.2)">
+    barMasiva.innerHTML = `<td colspan="15" style="padding:10px 12px;background:rgba(247,163,79,.08);border-bottom:1px solid rgba(247,163,79,.2)">
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
         <span style="font-size:12px;font-weight:700;color:var(--w)">🔄 ROTATIVOS — ${rotativos.length} empleados</span>
         <span style="font-size:11px;color:var(--dim)">|</span>
@@ -798,7 +798,7 @@ function renderEmpleados(sector, tarea){
   // ── FIJOS (después, ya precargados) ──
   if(fijos.length > 0){
     const sepFijo = document.createElement('tr');
-    sepFijo.innerHTML = `<td colspan="14" style="padding:10px 12px;background:rgba(46,207,168,.08);border-bottom:1px solid rgba(46,207,168,.2);font-size:12px;font-weight:700;color:var(--c)">
+    sepFijo.innerHTML = `<td colspan="15" style="padding:10px 12px;background:rgba(46,207,168,.08);border-bottom:1px solid rgba(46,207,168,.2);font-size:12px;font-weight:700;color:var(--c)">
       📌 FIJOS — ${fijos.length} empleados (precargados, modificar solo si hay cambios)
     </td>`;
     body.appendChild(sepFijo);
@@ -825,6 +825,7 @@ function buildEmpleadoRow(e, opts){
   let cells = `
     <td>${e.legajo}</td>
     <td style="max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${e.nombre}">${e.nombre}</td>
+    <td style="font-size:11px;color:var(--mid);max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${e.tarea||''}">${e.tarea||'—'}</td>
     <td><span class="tag tag-rot">ROTATIVO</span></td>
     <td style="font-size:10px;color:var(--dim)">${convLabel}</td>
     <td style="text-align:center"><button onclick="copiarLunesAFila(this)" style="background:none;border:1px solid var(--border);border-radius:4px;color:var(--w);cursor:pointer;font-size:12px;padding:2px 6px" title="Copiar Lunes a toda la semana">→</button></td>
@@ -948,6 +949,7 @@ function buildEmpleadoRowFijo(e, opts){
   let cells = `
     <td>${e.legajo}</td>
     <td style="max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${e.nombre}">${e.nombre}</td>
+    <td style="font-size:11px;color:var(--mid);max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${e.tarea||''}">${e.tarea||'—'}</td>
     <td><span class="tag tag-fijo">FIJO</span></td>
     <td style="font-size:10px;color:var(--dim)">${convLabel}</td>
     <td style="text-align:center"><button onclick="copiarLunesAFila(this)" style="background:none;border:1px solid var(--border);border-radius:4px;color:var(--c);cursor:pointer;font-size:12px;padding:2px 6px" title="Copiar Lunes a toda la semana">→</button></td>
@@ -1062,7 +1064,7 @@ function clearTable(){
   document.getElementById('pl-k2').textContent = '0';
   document.getElementById('pl-k3').textContent = '0';
   document.getElementById('pl-count').textContent = '0 empleados';
-  document.getElementById('pl-body').innerHTML = '<tr><td colspan="14" style="text-align:center;padding:24px;color:var(--dim)">Seleccioná sector y tarea</td></tr>';
+  document.getElementById('pl-body').innerHTML = '<tr><td colspan="15" style="text-align:center;padding:24px;color:var(--dim)">Seleccioná sector y tarea</td></tr>';
 }
 
 // Calcular horas de un turno código HHMMHHMM
@@ -1224,7 +1226,7 @@ function plValidarYEnviar(){
         if(vacios > 0){
           warnings.push(`🔄 ${nombre} (${legajo}): Tiene ${vacios} día(s) sin turno`);
         }
-        const convEl = tr.children[3].textContent;
+        const convEl = tr.children[4].textContent;
         let hsEsperadas = 48;
         if(convEl === 'CAM') hsEsperadas = 44;
         if(convEl === 'FDC') hsEsperadas = 40;
@@ -1639,7 +1641,7 @@ function copiarLunesAFila(btn){
   }
 
   // Detectar convenio para saber qué hacer con el sábado
-  const convTd = tr.children[3]; // columna Conv.
+  const convTd = tr.children[4]; // columna Conv.
   const convLabel = convTd ? convTd.textContent.trim() : '';
   const esCamionero = convLabel === 'CAM';
 
