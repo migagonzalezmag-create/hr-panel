@@ -1740,14 +1740,14 @@ function descargarPlanillaFirma(){
   const diasLetra = ['L','M','M','J','V','S','D']; // Lunes a Domingo, según semana de la herramienta
 
   // Fila 1: encabezado con fechas
-  const fila1 = ['LEGAJO', 'NOMBRE'];
+  const fila1 = ['LEGAJO', 'NOMBRE', 'TAREA'];
   semanaFechas.forEach(f => {
     fila1.push(String(f.getDate()).padStart(2,'0') + '/' + String(f.getMonth()+1).padStart(2,'0') + '/' + f.getFullYear());
   });
   fila1.push('FIRMA', 'ACLARACIÓN');
 
   // Fila 2: letra del día
-  const fila2 = ['', '', ...diasLetra, '', ''];
+  const fila2 = ['', '', '', ...diasLetra, '', ''];
 
   const aoa = [fila1, fila2];
   let totalFilas = 0;
@@ -1755,9 +1755,10 @@ function descargarPlanillaFirma(){
   rows.forEach(tr => {
     const legajo = tr.dataset.legajo;
     const nombre = tr.children[1].textContent.trim();
+    const tarea = tr.children[2].textContent.trim();
     const selects = tr.querySelectorAll('.turno-sel');
 
-    const filaEmpleado = [legajo, nombre];
+    const filaEmpleado = [legajo, nombre, tarea === '—' ? '' : tarea];
     selects.forEach((s) => {
       filaEmpleado.push(formatDisplayDia(s.value));
     });
@@ -1772,6 +1773,7 @@ function descargarPlanillaFirma(){
   ws['!cols'] = [
     {wch: 9},  // Legajo
     {wch: 30}, // Nombre
+    {wch: 20}, // Tarea
     {wch: 12},{wch: 12},{wch: 12},{wch: 12},{wch: 12},{wch: 12},{wch: 12}, // 7 días
     {wch: 16}, // Firma
     {wch: 20}, // Aclaración
