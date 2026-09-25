@@ -2355,6 +2355,21 @@ const DESCUENTOS = [
   'DESC. ANTICIPOS  Ct.:3 de 3'
 ];
 
+// ─── SUELDOS: estado de sede/mes ─────────────────────────────
+let _sedeSueldos = 'ambas';
+let _mesActualSueldos = '';
+
+function normSede(val){
+  const s = String(val||'').trim().toLowerCase();
+  if(s.includes('moreno')) return 'moreno';
+  if(s.includes('plata')) return 'la plata';
+  return 'sin sede';
+}
+
+function sedeLabel(s){
+  return s === 'la plata' ? 'La Plata' : s === 'moreno' ? 'Moreno' : s === 'ambas' ? 'Ambas sedes' : 'Sin sede asignada';
+}
+
 async function sueldosTab(el){
   el.innerHTML = `<div class="sec active">
     <div class="sh"><div><h2>Sueldos</h2><p>Cargando datos...</p></div></div>
@@ -2372,7 +2387,9 @@ async function sueldosTab(el){
     return;
   }
 
-  // Get available months
+  // Admin arranca con la sede elegida en el sidebar; el resto con "ambas"
+  _sedeSueldos = (role === 'admin') ? adminSucursal : 'ambas';
+
   const mesesMap = {};
   sueldos.forEach(r => {
     const mes = normalizeMesSueldos(r['Mes']||r['mes']||'');
@@ -2386,138 +2403,219 @@ async function sueldosTab(el){
 }
 
 function renderSueldosMes(el, mesKey, mesesDisp, mesPrevio){
+  _mesActualSueldos = mesKey;
+  _mesesSueldos = mesesDisp;
+  _mesPrevioSueldos = mesPrevio || '';
+
   const mesData = sueldos.filter(r => normalizeMesSueldos(r['Mes']||r['mes']||'') === mesKey);
   const mesLabel = mesKey ? (()=>{ const [a,m]=mesKey.split('-').map(Number); return new Date(a,m-1,1).toLocaleDateString('es-AR',{month:'long',year:'numeric'}); })() : '';
 
-  // Enrich with sector and convenio from nomina
-  const enriched = mesData.map(r => {
+  // Mapa de nómina por legajo (una sola pasada)
+  const empMap = {};
+  employees.forEach(e => { empMap[String(e['Legajo']||'').trim()] = e; });
+
+  // Enriquecer con sector, convenio y sede
+  const enrichedAll = mesData.map(r => {
     const leg = String(r['Legajo']||r['legajo']||'').trim();
-    const emp = employees.find(e => String(e['Legajo']||'').trim() === leg);
+    const emp = empMap[leg];
+    const sedeRaw = r['Sede'] || r['sede'] || r['Ubicación'] || r['Ubicacion'] ||
+                    (emp ? (emp['Ubicación'] || emp['Ubicacion'] || '') : '');
     return {
       ...r,
-      sector: emp ? (emp['Sector']||'Sin sector') : 'Sin sector',
-      convenio: emp ? (emp['Convenio']||'Sin convenio') : 'Sin convenio',
+      legajo: leg,
+      nombre: String(r['Nombre'] || r['nombre'] || (emp ? emp['Nombre'] : '') || ''),
+      sector: emp ? (emp['Sector'] || 'Sin sector') : 'Sin sector',
+      convenio: emp ? (emp['Convenio'] || 'Sin convenio') : 'Sin convenio',
+      sede: normSede(sedeRaw),
       monto: parseFloat(String(r['Monto']||r['monto']||'0').replace(',','.')) || 0,
       novedad: String(r['Novedad']||r['novedad']||'').trim().toUpperCase(),
     };
   });
 
-  // Helper
-  const sumBy = (arr, filter) => arr.filter(filter).reduce((a,r)=>a+r.monto, 0);
-  const isAporte = r => APORTES_PATRONALES.some(a => r.novedad.includes(a));
-  const isExtra = r => HORAS_EXTRAS.some(a => r.novedad === a);
+  // Clasificadores
+  const isAporte  = r => APORTES_PATRONALES.some(a => r.novedad.includes(a));
+  const isExtra   = r => HORAS_EXTRAS.some(a => r.novedad === a);
   const isFeriado = r => FERIADOS.some(a => r.novedad === a);
   const isDomingo = r => DOMINGOS.some(a => r.novedad === a);
   const isLicPaga = r => LICENCIAS_PAGAS.some(a => r.novedad === a);
-  const isDesc = r => DESCUENTOS.some(a => r.novedad.includes(a));
+  const isDesc    = r => DESCUENTOS.some(a => r.novedad.includes(a));
 
-  // KPIs
-  const masaBruta = sumBy(enriched, r => !isAporte(r) && !isDesc(r) && r.monto > 0);
-  const aportes = sumBy(enriched, r => isAporte(r));
-  const extras = sumBy(enriched, r => isExtra(r));
-  const feriados = sumBy(enriched, r => isFeriado(r));
-  const domingos = sumBy(enriched, r => isDomingo(r));
-  const licPagas = sumBy(enriched, r => isLicPaga(r));
-  const costoTotal = masaBruta + aportes;
-  const legajosUnicos = new Set(enriched.map(r=>r['Legajo']||r['legajo']||'')).size;
+  const resumen = rows => {
+    const sum = f => rows.filter(f).reduce((a,r)=>a+r.monto, 0);
+    const masa     = sum(r => !isAporte(r) && !isDesc(r) && r.monto > 0);
+    const aportes  = sum(isAporte);
+    const extras   = sum(isExtra);
+    const feriados = sum(isFeriado);
+    const domingos = sum(isDomingo);
+    const licPagas = sum(isLicPaga);
+    const emps     = new Set(rows.map(r=>r.legajo).filter(Boolean)).size;
+    const costo    = masa + aportes;
+    const adic     = extras + feriados + domingos;
+    return { masa, aportes, extras, feriados, domingos, licPagas, emps, costo, adic, prom: emps ? costo/emps : 0 };
+  };
 
-  // By Convenio
+  const fmt = n => '$' + Math.round(n||0).toLocaleString('es-AR');
+  const pct = (a,b,dec=1) => b ? ((a/b)*100).toFixed(dec) + '%' : '-';
+
+  // Resumen por sede (siempre sobre el total del mes)
+  const sedesPresentes = ['la plata','moreno'];
+  const sinSedeRows = enrichedAll.filter(r => r.sede === 'sin sede');
+  if(sinSedeRows.length) sedesPresentes.push('sin sede');
+  const resSede = {};
+  sedesPresentes.forEach(s => { resSede[s] = resumen(enrichedAll.filter(r => r.sede === s)); });
+  const resTotal = resumen(enrichedAll);
+
+  // Filas del detalle según sede elegida
+  const enriched = _sedeSueldos === 'ambas' ? enrichedAll : enrichedAll.filter(r => r.sede === _sedeSueldos);
+  const R = resumen(enriched);
+
+  // Por convenio (sede filtrada)
   const convenios = [...new Set(enriched.map(r=>r.convenio))].filter(Boolean);
-  const porConvenio = convenios.map(conv => {
-    const rows = enriched.filter(r=>r.convenio===conv);
-    return {
-      convenio: conv,
-      masa: sumBy(rows, r => !isAporte(r) && !isDesc(r) && r.monto > 0),
-      aportes: sumBy(rows, r => isAporte(r)),
-      extras: sumBy(rows, r => isExtra(r)),
-      feriados: sumBy(rows, r => isFeriado(r)),
-      domingos: sumBy(rows, r => isDomingo(r)),
-      licPagas: sumBy(rows, r => isLicPaga(r)),
-      emps: new Set(rows.map(r=>r['Legajo']||'')).size,
-    };
-  }).sort((a,b)=>b.masa-a.masa);
+  const porConvenio = convenios.map(conv => ({ convenio: conv, ...resumen(enriched.filter(r=>r.convenio===conv)) }))
+                               .sort((a,b)=>b.masa-a.masa);
 
-  // Extras by sector
+  // Adicionales por sector (sede filtrada)
   const extrasPorSector = {};
   enriched.filter(r => isExtra(r)||isFeriado(r)||isDomingo(r)).forEach(r => {
     extrasPorSector[r.sector] = (extrasPorSector[r.sector]||0) + r.monto;
   });
   const extSectorSort = Object.entries(extrasPorSector).sort((a,b)=>b[1]-a[1]).slice(0,8);
 
-  // Top extras by employee
+  // Top adicionales por empleado (sede filtrada)
   const extrasPorEmp = {};
   enriched.filter(r=>isExtra(r)||isFeriado(r)||isDomingo(r)).forEach(r=>{
-    const leg = String(r['Legajo']||r['legajo']||'');
-    if(!extrasPorEmp[leg]) extrasPorEmp[leg]={legajo:leg,nombre:String(r['Nombre']||r['nombre']||''),sector:r.sector,convenio:r.convenio,extras:0,feriados:0,domingos:0,total:0};
-    if(isExtra(r)) extrasPorEmp[leg].extras += r.monto;
+    const leg = r.legajo;
+    if(!extrasPorEmp[leg]) extrasPorEmp[leg] = {legajo:leg, nombre:r.nombre, sector:r.sector, convenio:r.convenio, sede:r.sede, extras:0, feriados:0, domingos:0, total:0};
+    if(isExtra(r))   extrasPorEmp[leg].extras   += r.monto;
     if(isFeriado(r)) extrasPorEmp[leg].feriados += r.monto;
     if(isDomingo(r)) extrasPorEmp[leg].domingos += r.monto;
     extrasPorEmp[leg].total += r.monto;
   });
   const topExtras = Object.values(extrasPorEmp).sort((a,b)=>b.total-a.total).slice(0,10);
 
-  const fmt = n => '$'+Math.round(n).toLocaleString('es-AR');
-  const totalAdicionales = extras + feriados + domingos;
+  const mini = (label, val, color) => `
+    <div style="background:var(--surface2);border-radius:8px;padding:8px 10px">
+      <div style="font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px">${label}</div>
+      <div style="font-size:13px;font-weight:700;${color?'color:'+color:''}">${val}</div>
+    </div>`;
 
-  _mesesSueldos = mesesDisp;
-  _mesPrevioSueldos = mesPrevio||'';
+  const sedeTit = _sedeSueldos === 'ambas' ? '' : ' · ' + sedeLabel(_sedeSueldos);
+
   el.innerHTML = `<div class="sec active">
   <div class="sh">
-    <div><h2>Sueldos · ${mesLabel}</h2><p>Análisis de costos laborales para Dirección</p></div>
+    <div><h2>Sueldos · ${mesLabel}${sedeTit}</h2><p>Análisis de costos laborales para Dirección</p></div>
     <button class="btn bts" onclick="sueldosLoaded=false;sueldosTab(document.getElementById('content'))">↻ Actualizar</button>
   </div>
 
   <!-- SELECTOR DE MES -->
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap">
-    <span style="font-size:12px;color:var(--dim)">Ver mes:</span>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+    <span style="font-size:12px;color:var(--dim);width:48px">Mes:</span>
     ${mesesDisp.map(m=>{
-      const [ma,mm]=m.split('-').map(Number); const lbl = new Date(ma,mm-1,1).toLocaleDateString('es-AR',{month:'short',year:'numeric'});
-      return `<button onclick="cambiarMesSueldos('${m}')"
-        class="btn ${m===mesKey?'btp':'bts'}" style="font-size:11px;padding:5px 12px">${lbl}</button>`;
+      const [ma,mm]=m.split('-').map(Number);
+      const lbl = new Date(ma,mm-1,1).toLocaleDateString('es-AR',{month:'short',year:'numeric'});
+      return `<button onclick="cambiarMesSueldos('${m}')" class="btn ${m===mesKey?'btp':'bts'}" style="font-size:11px;padding:5px 12px">${lbl}</button>`;
     }).join('')}
   </div>
 
-  <!-- KPIs PRINCIPALES -->
-  <div class="kgrid">
-    <div class="kcard ka"><div class="klbl">Costo Total Empresa</div><div class="kval" style="font-size:18px">${fmt(costoTotal)}</div><span class="kchg cne">Bruto + Aportes</span></div>
-    <div class="kcard kb"><div class="klbl">Masa Salarial Bruta</div><div class="kval" style="font-size:18px">${fmt(masaBruta)}</div><span class="kchg cne">${legajosUnicos} empleados</span></div>
-    <div class="kcard kw"><div class="klbl">Aportes Patronales</div><div class="kval" style="font-size:18px">${fmt(aportes)}</div><span class="kchg cne">${((aportes/costoTotal)*100).toFixed(1)}% del costo</span></div>
-    <div class="kcard kc"><div class="klbl">Costo Prom./Empleado</div><div class="kval" style="font-size:18px">${fmt(costoTotal/legajosUnicos)}</div></div>
+  <!-- SELECTOR DE SEDE -->
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+    <span style="font-size:12px;color:var(--dim);width:48px">Sede:</span>
+    ${[['ambas','Ambas'],['la plata','La Plata'],['moreno','Moreno']].map(([k,l])=>
+      `<button onclick="cambiarSedeSueldos('${k}')" class="btn ${k===_sedeSueldos?'btp':'bts'}" style="font-size:11px;padding:5px 12px">${l}</button>`
+    ).join('')}
   </div>
 
-  <!-- KPIs ADICIONALES SEPARADOS -->
+  ${sinSedeRows.length ? `<div class="alert aw">⚠️ ${resSede['sin sede'].emps} legajo(s) de sueldos no se encontraron en la Nómina (posibles bajas), así que no se les pudo asignar sede. Suman ${fmt(resSede['sin sede'].costo)}.</div>` : ''}
+
+  <!-- COMPARATIVA POR SEDE -->
+  <div style="font-family:Syne,sans-serif;font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;margin:4px 0 10px">Comparativa por sede</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:16px">
+    ${sedesPresentes.map(s=>{
+      const x = resSede[s];
+      const sel = _sedeSueldos === s;
+      const clickable = s !== 'sin sede';
+      return `<div class="cc" ${clickable?`onclick="cambiarSedeSueldos('${s}')"`:''} style="${clickable?'cursor:pointer;':''}${sel?'border-color:var(--a);box-shadow:0 0 0 1px var(--a);':''}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div class="ct">🏢 ${sedeLabel(s)}</div>
+          <span class="pill ${s==='sin sede'?'pw':'pb'}">${pct(x.costo, resTotal.costo)} del costo</span>
+        </div>
+        <div style="font-family:Syne,sans-serif;font-size:22px;font-weight:800;color:var(--a)">${fmt(x.costo)}</div>
+        <div class="cs">Costo total empresa (bruto + aportes)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          ${mini('Empleados', x.emps)}
+          ${mini('Costo prom.', fmt(x.prom))}
+          ${mini('Masa bruta', fmt(x.masa))}
+          ${mini('Aportes', fmt(x.aportes), 'var(--w)')}
+          ${mini('Adicionales', fmt(x.adic), 'var(--d)')}
+          ${mini('% adic./masa', pct(x.adic, x.masa))}
+        </div>
+      </div>`;
+    }).join('')}
+  </div>
+
+  <div class="cgrid">
+    <div class="tcard" style="margin-bottom:0">
+      <div class="thead"><h3>Detalle por Sede</h3><span class="pill pb">${mesLabel}</span></div>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>Sede</th><th>Emp.</th><th>Masa Bruta</th><th>Aportes</th><th>Costo Total</th><th>% Costo</th><th>Costo Prom.</th><th>H. Extra</th><th>Feriados</th><th>Domingos</th><th>Lic. Pagas</th></tr></thead>
+        <tbody>
+          ${sedesPresentes.map(s=>{ const x=resSede[s]; return `<tr style="${_sedeSueldos===s?'background:rgba(79,142,247,.06)':''}">
+            <td><strong>${sedeLabel(s)}</strong></td>
+            <td style="color:var(--mid)">${x.emps}</td>
+            <td>${fmt(x.masa)}</td>
+            <td style="color:var(--w)">${fmt(x.aportes)}</td>
+            <td style="font-weight:700;color:var(--a)">${fmt(x.costo)}</td>
+            <td>${pct(x.costo, resTotal.costo)}</td>
+            <td>${fmt(x.prom)}</td>
+            <td style="color:${x.extras>0?'var(--d)':'var(--dim)'}">${x.extras>0?fmt(x.extras):'-'}</td>
+            <td style="color:${x.feriados>0?'var(--w)':'var(--dim)'}">${x.feriados>0?fmt(x.feriados):'-'}</td>
+            <td style="color:${x.domingos>0?'var(--a)':'var(--dim)'}">${x.domingos>0?fmt(x.domingos):'-'}</td>
+            <td style="color:var(--mid)">${x.licPagas>0?fmt(x.licPagas):'-'}</td>
+          </tr>`; }).join('')}
+          <tr style="background:rgba(79,142,247,.1);font-weight:700">
+            <td>TOTAL EMPRESA</td>
+            <td>${resTotal.emps}</td>
+            <td>${fmt(resTotal.masa)}</td>
+            <td style="color:var(--w)">${fmt(resTotal.aportes)}</td>
+            <td style="color:var(--a)">${fmt(resTotal.costo)}</td>
+            <td>100%</td>
+            <td>${fmt(resTotal.prom)}</td>
+            <td style="color:var(--d)">${fmt(resTotal.extras)}</td>
+            <td style="color:var(--w)">${fmt(resTotal.feriados)}</td>
+            <td>${fmt(resTotal.domingos)}</td>
+            <td>${fmt(resTotal.licPagas)}</td>
+          </tr>
+        </tbody>
+      </table></div>
+    </div>
+    <div class="cc">
+      <div class="ct">Composición del Costo por Sede</div>
+      <div class="cs">Masa base · Adicionales · Aportes patronales</div>
+      <canvas id="ch-sede-comp"></canvas>
+    </div>
+  </div>
+
+  <!-- KPIs PRINCIPALES (sede filtrada) -->
+  <div style="font-family:Syne,sans-serif;font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;margin:20px 0 10px">Indicadores · ${sedeLabel(_sedeSueldos)}</div>
+  <div class="kgrid">
+    <div class="kcard ka"><div class="klbl">Costo Total Empresa</div><div class="kval" style="font-size:18px">${fmt(R.costo)}</div><span class="kchg cne">Bruto + Aportes</span></div>
+    <div class="kcard kb"><div class="klbl">Masa Salarial Bruta</div><div class="kval" style="font-size:18px">${fmt(R.masa)}</div><span class="kchg cne">${R.emps} empleados</span></div>
+    <div class="kcard kw"><div class="klbl">Aportes Patronales</div><div class="kval" style="font-size:18px">${fmt(R.aportes)}</div><span class="kchg cne">${pct(R.aportes, R.costo)} del costo</span></div>
+    <div class="kcard kc"><div class="klbl">Costo Prom./Empleado</div><div class="kval" style="font-size:18px">${fmt(R.prom)}</div></div>
+  </div>
+
   <div style="font-family:Syne,sans-serif;font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;margin:16px 0 10px">Conceptos adicionales</div>
   <div class="kgrid">
-    <div class="kcard kd">
-      <div class="klbl">Horas Extra</div>
-      <div class="kval" style="font-size:18px">${fmt(extras)}</div>
-      <span class="kchg cdo">${((extras/masaBruta)*100).toFixed(1)}% de la masa</span>
-    </div>
-    <div class="kcard kw">
-      <div class="klbl">Feriados Trabajados</div>
-      <div class="kval" style="font-size:18px">${fmt(feriados)}</div>
-      <span class="kchg cne">${((feriados/masaBruta)*100).toFixed(2)}% de la masa</span>
-    </div>
-    <div class="kcard kb">
-      <div class="klbl">Domingos Trabajados</div>
-      <div class="kval" style="font-size:18px">${fmt(domingos)}</div>
-      <span class="kchg cne">${((domingos/masaBruta)*100).toFixed(2)}% de la masa</span>
-    </div>
-    <div class="kcard kc">
-      <div class="klbl">Licencias Pagas</div>
-      <div class="kval" style="font-size:18px">${fmt(licPagas)}</div>
-      <span class="kchg cne">${((licPagas/masaBruta)*100).toFixed(2)}% de la masa</span>
-    </div>
-    <div class="kcard kb">
-      <div class="klbl">Total Adicionales</div>
-      <div class="kval" style="font-size:18px">${fmt(totalAdicionales)}</div>
-      <span class="kchg cdo">${((totalAdicionales/masaBruta)*100).toFixed(1)}% de la masa</span>
-    </div>
+    <div class="kcard kd"><div class="klbl">Horas Extra</div><div class="kval" style="font-size:18px">${fmt(R.extras)}</div><span class="kchg cdo">${pct(R.extras, R.masa)} de la masa</span></div>
+    <div class="kcard kw"><div class="klbl">Feriados Trabajados</div><div class="kval" style="font-size:18px">${fmt(R.feriados)}</div><span class="kchg cne">${pct(R.feriados, R.masa, 2)} de la masa</span></div>
+    <div class="kcard kb"><div class="klbl">Domingos Trabajados</div><div class="kval" style="font-size:18px">${fmt(R.domingos)}</div><span class="kchg cne">${pct(R.domingos, R.masa, 2)} de la masa</span></div>
+    <div class="kcard kc"><div class="klbl">Licencias Pagas</div><div class="kval" style="font-size:18px">${fmt(R.licPagas)}</div><span class="kchg cne">${pct(R.licPagas, R.masa, 2)} de la masa</span></div>
+    <div class="kcard kb"><div class="klbl">Total Adicionales</div><div class="kval" style="font-size:18px">${fmt(R.adic)}</div><span class="kchg cdo">${pct(R.adic, R.masa)} de la masa</span></div>
   </div>
 
   <!-- POR CONVENIO -->
   <div class="tcard" style="margin-top:20px">
-    <div class="thead"><h3>Costo por Convenio</h3><span class="pill pb">${mesLabel}</span></div>
+    <div class="thead"><h3>Costo por Convenio · ${sedeLabel(_sedeSueldos)}</h3><span class="pill pb">${mesLabel}</span></div>
     <div style="overflow-x:auto"><table>
       <thead><tr><th>Convenio</th><th>Empleados</th><th>Masa Bruta</th><th>Aportes</th><th>Costo Total</th><th>Horas Extra</th><th>Feriados</th><th>Domingos</th><th>Lic. Pagas</th></tr></thead>
       <tbody>
@@ -2526,7 +2624,7 @@ function renderSueldosMes(el, mesKey, mesesDisp, mesPrevio){
           <td style="color:var(--mid)">${c.emps}</td>
           <td style="font-weight:600">${fmt(c.masa)}</td>
           <td style="color:var(--w)">${fmt(c.aportes)}</td>
-          <td style="font-weight:700;color:var(--a)">${fmt(c.masa+c.aportes)}</td>
+          <td style="font-weight:700;color:var(--a)">${fmt(c.costo)}</td>
           <td style="color:${c.extras>0?'var(--d)':'var(--dim)'}">${c.extras>0?fmt(c.extras):'-'}</td>
           <td style="color:${c.feriados>0?'var(--w)':'var(--dim)'}">${c.feriados>0?fmt(c.feriados):'-'}</td>
           <td style="color:${c.domingos>0?'var(--b)':'var(--dim)'}">${c.domingos>0?fmt(c.domingos):'-'}</td>
@@ -2534,14 +2632,14 @@ function renderSueldosMes(el, mesKey, mesesDisp, mesPrevio){
         </tr>`).join('')}
         <tr style="background:rgba(79,142,247,.06);font-weight:700">
           <td>TOTAL</td>
-          <td>${legajosUnicos}</td>
-          <td>${fmt(masaBruta)}</td>
-          <td style="color:var(--w)">${fmt(aportes)}</td>
-          <td style="color:var(--a)">${fmt(costoTotal)}</td>
-          <td style="color:var(--d)">${fmt(extras)}</td>
-          <td style="color:var(--w)">${fmt(feriados)}</td>
-          <td>${fmt(domingos)}</td>
-          <td>${fmt(licPagas)}</td>
+          <td>${R.emps}</td>
+          <td>${fmt(R.masa)}</td>
+          <td style="color:var(--w)">${fmt(R.aportes)}</td>
+          <td style="color:var(--a)">${fmt(R.costo)}</td>
+          <td style="color:var(--d)">${fmt(R.extras)}</td>
+          <td style="color:var(--w)">${fmt(R.feriados)}</td>
+          <td>${fmt(R.domingos)}</td>
+          <td>${fmt(R.licPagas)}</td>
         </tr>
       </tbody>
     </table></div>
@@ -2551,62 +2649,80 @@ function renderSueldosMes(el, mesKey, mesesDisp, mesPrevio){
   <div class="cgrid">
     <div class="cc">
       <div class="ct">Adicionales por Tipo</div>
-      <div class="cs">Extras, feriados, domingos y licencias</div>
+      <div class="cs">${sedeLabel(_sedeSueldos)} · extras, feriados, domingos y licencias</div>
       <canvas id="ch-adic-tipo"></canvas>
     </div>
     <div class="cc">
-      <div class="ct">Horas Extras por Sector</div>
-      <div class="cs">Top 8 sectores — extras + feriados + domingos</div>
+      <div class="ct">Adicionales por Sector</div>
+      <div class="cs">${sedeLabel(_sedeSueldos)} · top 8 — extras + feriados + domingos</div>
       <canvas id="ch-ext-sect"></canvas>
     </div>
   </div>
 
   <!-- TOP EXTRAS POR EMPLEADO -->
   <div class="tcard">
-    <div class="thead"><h3>Top 10 — Adicionales por Empleado</h3><span class="pill pd">Extras + Feriados + Domingos</span></div>
+    <div class="thead"><h3>Top 10 — Adicionales por Empleado · ${sedeLabel(_sedeSueldos)}</h3><span class="pill pd">Extras + Feriados + Domingos</span></div>
     <div style="overflow-x:auto"><table>
-      <thead><tr><th>#</th><th>Empleado</th><th>Sector</th><th>Convenio</th><th>Horas Extra</th><th>Feriados</th><th>Domingos</th><th>Total</th></tr></thead>
+      <thead><tr><th>#</th><th>Empleado</th><th>Sede</th><th>Sector</th><th>Convenio</th><th>Horas Extra</th><th>Feriados</th><th>Domingos</th><th>Total</th></tr></thead>
       <tbody>
-        ${topExtras.map((e,i)=>`<tr>
+        ${topExtras.length ? topExtras.map((e,i)=>`<tr>
           <td style="color:var(--dim);font-weight:700">${i+1}</td>
           <td><div style="display:flex;align-items:center;gap:8px">
-            <div class="av notranslate" translate="no" style="background:${avColor(e.nombre)};flex-shrink:0">${avSafe(e.nombre)}</div>
+            <div class="av notranslate" translate="no" style="background:${avColor(e.nombre||'?')};flex-shrink:0">${avSafe(e.nombre)}</div>
             <strong style="font-size:12px">${safeName(e.nombre)}</strong></div></td>
+          <td style="font-size:11px">${sedeLabel(e.sede)}</td>
           <td><span class="pill pgy" style="font-size:10px">${e.sector}</span></td>
           <td style="font-size:11px;color:var(--mid)">${e.convenio}</td>
           <td style="color:${e.extras>0?'var(--d)':'var(--dim)'}">${e.extras>0?fmt(e.extras):'-'}</td>
           <td style="color:${e.feriados>0?'var(--w)':'var(--dim)'}">${e.feriados>0?fmt(e.feriados):'-'}</td>
           <td style="color:${e.domingos>0?'var(--a)':'var(--dim)'}">${e.domingos>0?fmt(e.domingos):'-'}</td>
           <td style="font-weight:700;color:var(--c)">${fmt(e.total)}</td>
-        </tr>`).join('')}
+        </tr>`).join('') : `<tr><td colspan="9" style="text-align:center;color:var(--dim);padding:20px">Sin adicionales en ${sedeLabel(_sedeSueldos)} para este mes</td></tr>`}
       </tbody>
-    </table>
+    </table></div>
   </div>
 
   </div>`;
 
   setTimeout(()=>{
-    // Adicionales by tipo
+    // Composición por sede (apilado)
+    charts.sedecomp = new Chart(document.getElementById('ch-sede-comp'),{
+      type:'bar',
+      data:{
+        labels: sedesPresentes.map(sedeLabel),
+        datasets:[
+          {label:'Masa base',   data: sedesPresentes.map(s=>resSede[s].masa - resSede[s].adic), backgroundColor:'rgba(79,142,247,.75)', borderRadius:4, borderSkipped:false},
+          {label:'Adicionales', data: sedesPresentes.map(s=>resSede[s].adic),                   backgroundColor:'rgba(247,95,95,.75)',  borderRadius:4, borderSkipped:false},
+          {label:'Aportes',     data: sedesPresentes.map(s=>resSede[s].aportes),                backgroundColor:'rgba(247,163,79,.75)', borderRadius:4, borderSkipped:false},
+        ]
+      },
+      options:{
+        plugins:{
+          legend:{labels:{color:'#9ba3bb',font:{size:11}}},
+          tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': $'+Math.round(ctx.raw).toLocaleString('es-AR')}}
+        },
+        scales:{
+          x:{stacked:true, ticks:{color:'#6b738f'}, grid:{display:false}},
+          y:{stacked:true, ticks:{color:'#6b738f', callback:v=>'$'+Math.round(v/1000000)+'M'}, grid:{color:'#1e2640'}}
+        }
+      }
+    });
+
+    // Adicionales por tipo
     charts.adictipo = new Chart(document.getElementById('ch-adic-tipo'),{
       type:'doughnut',
       data:{
         labels:['Horas Extra','Feriados','Domingos','Licencias Pagas'],
-        datasets:[{
-          data:[extras,feriados,domingos,licPagas],
-          backgroundColor:['#f75f5f','#f7a34f','#4f8ef7','#2ecfa8'],
-          borderWidth:0,hoverOffset:5
-        }]
+        datasets:[{ data:[R.extras,R.feriados,R.domingos,R.licPagas], backgroundColor:['#f75f5f','#f7a34f','#4f8ef7','#2ecfa8'], borderWidth:0, hoverOffset:5 }]
       },
       options:{plugins:{legend:{labels:{color:'#9ba3bb',font:{size:11}}}},cutout:'55%'}
     });
 
-    // Extras by sector
+    // Adicionales por sector
     charts.extsect = new Chart(document.getElementById('ch-ext-sect'),{
       type:'bar',
       data:{labels:extSectorSort.map(e=>e[0]),datasets:[{
-        data:extSectorSort.map(e=>e[1]),
-        backgroundColor:'rgba(247,163,79,.75)',
-        borderRadius:5,borderSkipped:false
+        data:extSectorSort.map(e=>e[1]), backgroundColor:'rgba(247,163,79,.75)', borderRadius:5, borderSkipped:false
       }]},
       options:{indexAxis:'y',plugins:{legend:{display:false},
         tooltip:{callbacks:{label:ctx=>'$'+Math.round(ctx.raw).toLocaleString('es-AR')}}},
@@ -2619,9 +2735,14 @@ function renderSueldosMes(el, mesKey, mesesDisp, mesPrevio){
 }
 
 function cambiarMesSueldos(mes){
-  const el = document.getElementById('content');
   destroyCharts();
-  renderSueldosMes(el, mes, _mesesSueldos, _mesPrevioSueldos);
+  renderSueldosMes(document.getElementById('content'), mes, _mesesSueldos, _mesPrevioSueldos);
+}
+
+function cambiarSedeSueldos(sede){
+  _sedeSueldos = sede;
+  destroyCharts();
+  renderSueldosMes(document.getElementById('content'), _mesActualSueldos, _mesesSueldos, _mesPrevioSueldos);
 }
 
 // ═══════════════════════════════════════════════════════════════
