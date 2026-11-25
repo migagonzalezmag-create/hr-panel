@@ -27,6 +27,16 @@
   --card2:#F0F3F9; --txt:#1F2937;
 }
 *{margin:0;padding:0;box-sizing:border-box}
+.ficha-head{display:flex;gap:20px;align-items:center;flex-wrap:wrap;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:22px;margin-bottom:14px}
+.ficha-nombre{font-family:'Playfair Display',Georgia,serif;font-size:26px;font-weight:700;color:var(--a);line-height:1.2}
+.ficha-ini{width:96px;height:96px;border-radius:18px;background:rgba(0,46,157,.08);color:var(--a);display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:700}
+.ficha-chip{font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:100px;border:1px solid}
+.ficha-datos{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.ficha-dato{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;font-size:13.5px;font-weight:600}
+.ficha-dato .klbl{margin-bottom:4px}
+.ficha-monto{background:var(--surface2);border-radius:12px;padding:14px}
+.ficha-monto>div:last-child{font-size:22px;font-weight:700;margin-top:4px}
+@media(max-width:700px){.ficha-datos{grid-template-columns:1fr 1fr}#ficha-sec .kval{font-size:21px;word-break:break-word}#ficha-sec .cgrid>.cc{min-width:0}#ficha-sec table{font-size:11.5px}}
 @media print{.sidebar,.topbar,.sb-overlay,.liq-noprint,.toast{display:none!important}.content{margin:0!important;padding:0!important;max-width:none!important}body{background:#fff!important;color:#000!important}.kcard,.cc,.tcard,.fcard{background:#fff!important;border-color:#bbb!important;break-inside:avoid}td,th,.klbl,.cs{color:#000!important}}
 body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
 
@@ -234,7 +244,9 @@ textarea{resize:vertical;min-height:70px}
   .sb-overlay.open{display:block}
   .topbar{display:flex}
   .hamburger{display:block}
-  .content{margin-left:0;padding:14px}
+  #app{flex-direction:column}
+  .content{margin-left:0;padding:14px;min-width:0;max-width:100vw}
+  .tcard{overflow-x:auto}
   .kgrid{grid-template-columns:1fr 1fr}
   .chlg{grid-template-columns:1fr 1fr}
   th,td{padding:8px 12px}
@@ -550,10 +562,10 @@ function calcAntig(fechaStr){
 
 // ─── BUILD APP ────────────────────────────────────────────────
 const ROLES = {
-  analyst:    {label:'Analista RRHH',    badge:'ba', tabs:['Inicio','Dashboard','Nómina','Sectores','Antigüedad','Ausentismo','Licencias','Academia','Planificación Horaria']},
-  supervisor: {label:'Jefe / Supervisor', badge:'bs', tabs:['Inicio','Nómina','Ausentismo','Licencias','Academia','Planificación Horaria']},
-  director:   {label:'Dirección',         badge:'bd', tabs:['Inicio','Ejecutivo','Composición','Ausentismo','Sueldos','Nómina','Negociaciones','Academia','Planificación Horaria']},
-  admin:      {label:'Administrador',     badge:'bd', tabs:['Inicio','Dashboard','Nómina','Sectores','Antigüedad','Ejecutivo','Composición','Ausentismo','Licencias','Sueldos','Negociaciones','Liquidación final','Academia','Planificación Horaria']},
+  analyst:    {label:'Analista RRHH',    badge:'ba', tabs:['Inicio','Dashboard','Nómina','Ficha 360','Sectores','Antigüedad','Ausentismo','Licencias','Academia','Planificación Horaria']},
+  supervisor: {label:'Jefe / Supervisor', badge:'bs', tabs:['Inicio','Nómina','Ficha 360','Ausentismo','Licencias','Academia','Planificación Horaria']},
+  director:   {label:'Dirección',         badge:'bd', tabs:['Inicio','Ejecutivo','Composición','Ausentismo','Sueldos','Nómina','Ficha 360','Negociaciones','Academia','Planificación Horaria']},
+  admin:      {label:'Administrador',     badge:'bd', tabs:['Inicio','Dashboard','Nómina','Ficha 360','Sectores','Antigüedad','Ejecutivo','Composición','Ausentismo','Licencias','Sueldos','Negociaciones','Liquidación final','Academia','Planificación Horaria']},
 };
 
 // Íconos de línea (se ven iguales en cualquier dispositivo)
@@ -563,6 +575,7 @@ const TAB_ICONS = {
   'Dashboard': _svg('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'),
   'Ejecutivo': _svg('<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>'),
   'Nómina': _svg('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.8c1.6.8 2.6 2.5 3 5.2"/>'),
+  'Ficha 360': _svg('<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10.5" r="2.5"/><path d="M5.5 16.5c.6-1.8 1.9-2.8 3.5-2.8s2.9 1 3.5 2.8M15 9h3M15 12.5h3"/>'),
   'Sectores': _svg('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'),
   'Antigüedad': _svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
   'Composición': _svg('<path d="M12 3a9 9 0 1 0 9 9h-9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/>'),
@@ -580,7 +593,7 @@ const TAB_ICON_DEF = _svg('<path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4"/>');
 // Grupos del menú (el orden de los grupos es el del menú)
 const TAB_GROUPS = [
   { nombre: null,          tabs: ['Inicio','Dashboard','Ejecutivo'] },
-  { nombre: 'Personal',    icono: TAB_ICONS['Nómina'],         tabs: ['Nómina','Sectores','Antigüedad','Composición','Mi Equipo'] },
+  { nombre: 'Personal',    icono: TAB_ICONS['Nómina'],         tabs: ['Nómina','Ficha 360','Sectores','Antigüedad','Composición','Mi Equipo'] },
   { nombre: 'Asistencia',  icono: TAB_ICONS['Ausentismo'],     tabs: ['Ausentismo','Licencias','Novedades'] },
   { nombre: 'Costos',      icono: TAB_ICONS['Sueldos'],        tabs: ['Sueldos'] },
   { nombre: 'Negociación', icono: TAB_ICONS['Negociaciones'],  tabs: ['Negociaciones','Liquidación final'] },
@@ -694,6 +707,7 @@ function renderTab(tab){
     'Inicio':(el)=>inicioTab(el),
     'Dashboard':(el)=>analystDash(el),
     'Nómina':(el)=>nominaTab(el),
+    'Ficha 360':(el)=>fichaTab(el),
     'Sectores':(el)=>sectoresTab(el),
     'Antigüedad':(el)=>antigTab(el),
     'Mi Equipo':(el)=>myTeam(el),
@@ -869,69 +883,228 @@ function nominaTab(el){
   </div></div>`;
 }
 
+// ═══════════════════════════════════════════════════════════════
+// FICHA 360 — todo de una persona en una pantalla
+// ═══════════════════════════════════════════════════════════════
+let fichaLegajo = null;
+
 function showFichaEmpleado(legajo){
-  const e = employees.find(emp => String(emp['Legajo']||'').trim() === legajo);
-  if(!e) return;
+  fichaLegajo = String(legajo||'').trim();
+  const btn = [...document.querySelectorAll('button.sb-tab')].find(b => (b.getAttribute('onclick')||'').includes("'Ficha 360'"));
+  if(btn) switchTab(btn, 'Ficha 360');
+  else renderTab('Ficha 360');
+  window.scrollTo({top:0});
+}
 
-  const fotoUrl = getFotoUrl(legajo, 300);
-  const fotoHtml = fotoUrl
-    ? `<img src="${fotoUrl}" style="width:160px;height:160px;border-radius:16px;object-fit:cover;border:2px solid var(--border);box-shadow:0 8px 32px rgba(0,0,0,.4)" onerror="this.outerHTML='<div style=\\'width:160px;height:160px;border-radius:16px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:48px;color:var(--dim)\\'><svg width=&quot;64&quot; height=&quot;64&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.4&quot;><circle cx=&quot;12&quot; cy=&quot;8&quot; r=&quot;4&quot;/><path d=&quot;M4 21c1-4 4-6 8-6s7 2 8 6&quot;/></svg></div>'">`
-    : `<div style="width:160px;height:160px;border-radius:16px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:48px;color:var(--dim)"><svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg></div>`;
+const fichaPesos = n => (Number(n)||0).toLocaleString('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0});
+const fichaLegNorm = v => { const s = String(v||'').trim(); return String(parseInt(s,10)||s); };
+const fichaDia = 86400000;
 
-  const antig = calcAntig(e['Fecha Ingreso']);
-
-  // Crear modal
-  const modal = document.createElement('div');
-  modal.id = 'ficha-modal';
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;display:flex;align-items:center;justify-content:center;animation:fadeUp .2s ease';
-  modal.onclick = function(ev){ if(ev.target === modal) modal.remove(); };
-
-  modal.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:32px;max-width:480px;width:90%;box-shadow:0 16px 64px rgba(0,0,0,.5);position:relative">
-    <button onclick="document.getElementById('ficha-modal').remove()" style="position:absolute;top:12px;right:16px;background:none;border:none;color:var(--dim);font-size:20px;cursor:pointer">✕</button>
-    <div style="display:flex;flex-direction:column;align-items:center;gap:16px;margin-bottom:20px">
-      ${fotoHtml}
-      <div style="text-align:center">
-        <h3 style="font-family:Poppins,sans-serif;font-size:18px;font-weight:800;margin-bottom:4px">${e['Nombre']||'-'}</h3>
-        <span style="color:var(--mid);font-size:13px">Legajo ${legajo}</span>
-      </div>
+function fichaTab(el){
+  const lista = (employees||[]).filter(e => String(e['Legajo']||'').trim());
+  const opciones = lista.map(e => `<option value="${escHtml(String(e['Legajo']).trim())} — ${escHtml(e['Nombre']||'')}"></option>`).join('');
+  el.innerHTML = `<div class="sec active" id="ficha-sec">
+    <div class="sh"><div><h2>Ficha 360</h2><p>Todo lo que hay de una persona en una sola pantalla</p></div>
+      <button class="btn bts liq-noprint" onclick="window.print()">Imprimir</button></div>
+    <div class="fcard liq-noprint" style="display:flex;gap:12px;align-items:end;flex-wrap:wrap">
+      <div style="flex:1;min-width:240px"><div class="klbl">Legajo o nombre</div>
+        <input class="sinput" id="ficha-emp" list="ficha-emps" placeholder="Escribí el legajo o el apellido" style="width:100%" autocomplete="off">
+        <datalist id="ficha-emps">${opciones}</datalist></div>
+      <button class="btn btp" onclick="fichaBuscar()">Ver ficha</button>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-      <div style="background:var(--surface2);border-radius:10px;padding:12px">
-        <div style="font-size:10px;color:var(--dim);text-transform:uppercase;margin-bottom:4px">Sector</div>
-        <div style="font-size:13px;font-weight:600">${e['Sector']||'-'}</div>
-      </div>
-      <div style="background:var(--surface2);border-radius:10px;padding:12px">
-        <div style="font-size:10px;color:var(--dim);text-transform:uppercase;margin-bottom:4px">Tarea</div>
-        <div style="font-size:13px;font-weight:600">${e['Tarea']||'-'}</div>
-      </div>
-      <div style="background:var(--surface2);border-radius:10px;padding:12px">
-        <div style="font-size:10px;color:var(--dim);text-transform:uppercase;margin-bottom:4px">Horario</div>
-        <div style="font-size:13px;font-weight:600">${e['HORARIO']||'-'}</div>
-      </div>
-      <div style="background:var(--surface2);border-radius:10px;padding:12px">
-        <div style="font-size:10px;color:var(--dim);text-transform:uppercase;margin-bottom:4px">Convenio</div>
-        <div style="font-size:13px;font-weight:600">${e['Convenio']||'-'}</div>
-      </div>
-      <div style="background:var(--surface2);border-radius:10px;padding:12px">
-        <div style="font-size:10px;color:var(--dim);text-transform:uppercase;margin-bottom:4px">Antigüedad</div>
-        <div style="font-size:13px;font-weight:600">${antig.toFixed(1)} años</div>
-      </div>
-      <div style="background:var(--surface2);border-radius:10px;padding:12px">
-        <div style="font-size:10px;color:var(--dim);text-transform:uppercase;margin-bottom:4px">Ingreso</div>
-        <div style="font-size:13px;font-weight:600">${formatFecha(e['Fecha Ingreso'])}</div>
-      </div>
-      <div style="background:var(--surface2);border-radius:10px;padding:12px">
-        <div style="font-size:10px;color:var(--dim);text-transform:uppercase;margin-bottom:4px">Categoría</div>
-        <div style="font-size:13px;font-weight:600">${e['Categoria']||'-'}</div>
-      </div>
-      <div style="background:var(--surface2);border-radius:10px;padding:12px">
-        <div style="font-size:10px;color:var(--dim);text-transform:uppercase;margin-bottom:4px">Ubicación</div>
-        <div style="font-size:13px;font-weight:600">${e['Ubicación']||e['Ubicacion']||'-'}</div>
-      </div>
-    </div>
+    <div id="ficha-out">${fichaLegajo ? '' : '<div class="empty" style="padding:50px 20px"><div class="em">'+TAB_ICONS['Mi Equipo']+'</div>Buscá a una persona por legajo o apellido. También podés abrir la ficha tocando a alguien en Nómina o en Inicio.</div>'}</div>
   </div>`;
+  const inp = document.getElementById('ficha-emp');
+  inp.addEventListener('keydown', ev => { if(ev.key==='Enter') fichaBuscar(); });
+  inp.addEventListener('change', () => { if(inp.value.includes('—')) fichaBuscar(); });
+  if(fichaLegajo) fichaRender(fichaLegajo);
+}
 
-  document.body.appendChild(modal);
+function fichaBuscar(){
+  const out = document.getElementById('ficha-out');
+  const t = String(document.getElementById('ficha-emp').value||'').trim();
+  if(!t) return;
+  const leg = t.split('—')[0].trim();
+  let e = (employees||[]).find(x => String(x['Legajo']).trim() === leg);
+  if(!e){
+    const q = t.toLowerCase();
+    const m = (employees||[]).filter(x => String(x['Nombre']||'').toLowerCase().includes(q));
+    if(m.length === 1) e = m[0];
+    else if(m.length > 1){ out.innerHTML = `<div class="alert" style="background:rgba(217,119,6,.1);color:var(--w)">Hay ${m.length} personas que coinciden. Elegí una de la lista o escribí el legajo.</div>`; return; }
+  }
+  if(!e){ out.innerHTML = '<div class="alert" style="background:rgba(217,119,6,.1);color:var(--w)">No encontré a esa persona en la nómina.</div>'; return; }
+  fichaLegajo = String(e['Legajo']).trim();
+  fichaRender(fichaLegajo);
+}
+
+function fichaAntigTexto(ing){
+  const hoy = new Date(); if(!ing) return '-';
+  let a = hoy.getFullYear() - ing.getFullYear(), m = hoy.getMonth() - ing.getMonth();
+  if(hoy.getDate() < ing.getDate()) m--;
+  if(m < 0){ a--; m += 12; }
+  return `${a} ${a===1?'año':'años'} y ${m} ${m===1?'mes':'meses'}`;
+}
+
+function fichaSeries(filas, mapa){
+  const porMes = {};
+  (filas||[]).forEach(f => {
+    const mes = String(f.Mes||f.mes||'').trim().slice(0,7);
+    if(!/^\d{4}-\d{2}$/.test(mes)) return;
+    const tipo = LIQ.clasificar(LIQ.norm(f.Novedad||f.novedad||''), mapa);
+    if(!['FIJO','VARIABLE','NOREM'].includes(tipo)) return;
+    porMes[mes] = (porMes[mes]||0) + LIQ.numero(f.Monto);
+  });
+  return Object.keys(porMes).sort().map(k => ({ mes:k, total:porMes[k] }));
+}
+
+async function fichaRender(legajo){
+  const out = document.getElementById('ficha-out'); if(!out) return;
+  const e = (employees||[]).find(x => String(x['Legajo']||'').trim() === legajo);
+  if(!e){ out.innerHTML = '<div class="alert" style="background:rgba(217,119,6,.1);color:var(--w)">Esa persona no está en la nómina que podés ver.</div>'; return; }
+  const inp = document.getElementById('ficha-emp'); if(inp) inp.value = `${legajo} — ${e['Nombre']||''}`;
+  out.innerHTML = '<div style="display:flex;align-items:center;gap:14px;padding:30px"><div class="spinner"></div><span style="color:var(--mid)">Armando la ficha de ' + escHtml(e['Nombre']||'') + '...</span></div>';
+
+  const esAdmin = role === 'admin';
+  const tareas = [loadAusencias().catch(()=>{}), loadLicencias().catch(()=>{})];
+  let filasSueldo = null, errSueldo = '';
+  if(esAdmin){
+    tareas.push(liqCargarConfig().catch(err => { errSueldo = err.message; }));
+    tareas.push(api({ action:'sueldosLegajo', legajo }).then(f => { filasSueldo = f; }).catch(err => { errSueldo = err.message; }));
+  }
+  await Promise.all(tareas);
+  if(fichaLegajo !== legajo || !document.getElementById('ficha-out')) return;   // cambió de persona o de pestaña
+
+  const hoy = new Date();
+  const desde12 = new Date(hoy.getTime() - 365*fichaDia);
+  const ln = fichaLegNorm(legajo);
+  const ing = parseFecha(e['Fecha Ingreso']);
+
+  // Ausencias (últimos 12 meses): días = fin - inicio, igual que la pestaña Ausentismo
+  const diasAus = r => { const a = parseFecha(r['Fecha Inicio']||r['fecha inicio']), b = parseFecha(r['Fecha Fin']||r['fecha fin']); if(!a||!b) return 0;
+    const ini = a < desde12 ? desde12 : a, fin = b > hoy ? hoy : b; return Math.max(0, Math.round((fin-ini)/fichaDia)); };
+  const aus12 = (ausenciasRaw||[]).filter(r => { const f = parseFecha(r['Fecha Fin']||r['fecha fin']||r['Fecha Inicio']); return f && f >= desde12; });
+  const misAus = aus12.filter(r => fichaLegNorm(r['Legajo']||r['legajo']) === ln).map(r => ({ inicio:r['Fecha Inicio']||r['fecha inicio'], fin:r['Fecha Fin']||r['fecha fin'], motivo:String(r['Motivo']||r['motivo']||'Sin dato').trim(), dias:diasAus(r) }))
+    .sort((a,b) => (parseFecha(b.inicio)||0) - (parseFecha(a.inicio)||0));
+  const diasAusTot = misAus.reduce((s,r)=>s+r.dias,0);
+  const sector = String(e['Sector']||'').trim();
+  const delSector = new Set((employees||[]).filter(x => String(x['Sector']||'').trim() === sector).map(x => fichaLegNorm(x['Legajo'])));
+  const diasSector = aus12.filter(r => delSector.has(fichaLegNorm(r['Legajo']||r['legajo']))).reduce((s,r)=>s+diasAus(r),0);
+  const promSector = delSector.size ? diasSector / delSector.size : 0;
+  const ausMotivo = {}; misAus.forEach(r => { ausMotivo[r.motivo] = (ausMotivo[r.motivo]||0) + r.dias; });
+
+  // Licencias (todo el historial cargado)
+  const misLic = (licenciasRaw||[]).filter(r => fichaLegNorm(r['legajo']||r['Legajo']) === ln).map(r => ({ inicio:r['fecha inicio']||r['Fecha Inicio']||'', dias:parseInt(r['dias']||r['Dias']||0)||0, motivo:String(r['motivo']||r['Motivo']||'Sin dato').trim(), obs:String(r['Observacion']||r['observacion']||'').trim() }))
+    .sort((a,b) => (parseFecha(b.inicio)||0) - (parseFecha(a.inicio)||0));
+  const licDias = misLic.reduce((s,r)=>s+r.dias,0);
+  const licDias12 = misLic.filter(r => { const f = parseFecha(r.inicio); return f && f >= desde12; }).reduce((s,r)=>s+r.dias,0);
+
+  // Antigüedad, prueba e hitos
+  const antTxt = fichaAntigTexto(ing);
+  const finPrueba = ing ? new Date(ing.getFullYear(), ing.getMonth()+6, ing.getDate()) : null;
+  const enPrueba = finPrueba && finPrueba > hoy;
+  const aniosHoy = ing ? (hoy - ing) / (365.25*fichaDia) : 0;
+  const prox = ing ? Math.floor(aniosHoy) + 1 : 0;
+  const fechaProx = ing ? new Date(ing.getFullYear()+prox, ing.getMonth(), ing.getDate()) : null;
+  const hito = [5,10,20].includes(prox) && fechaProx && (fechaProx - hoy) < 120*fichaDia;
+  const antig31 = ing ? (new Date(hoy.getFullYear(),11,31) - ing) / (365.25*fichaDia) : 0;
+  const vacAnio = antig31 < 5 ? 14 : antig31 < 10 ? 21 : antig31 < 20 ? 28 : 35;
+  const fF = d => d ? d.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'}) : '-';
+
+  // Sueldo y liquidación (solo administrador)
+  let serie = [], liq = null, errLiq = '';
+  if(esAdmin && filasSueldo && liqCfg){
+    serie = fichaSeries(filasSueldo, liqCfg.mapa);
+    try {
+      const hoyISO = new Date(hoy.getTime() - hoy.getTimezoneOffset()*60000).toISOString().slice(0,10);
+      liq = LIQ.calcular({ fechaIngreso:e['Fecha Ingreso'], fechaEgreso:hoyISO, convenio:e['Convenio']||'', filasSueldo, mapaConceptos:liqCfg.mapa, topes:liqCfg.topes, topeManual:0, preavisoOtorgado:false, vacPendientes:0, vacGozadasAnio:0 });
+    } catch(err){ errLiq = err.message; }
+  }
+
+  // ── Armado ──
+  const foto = getFotoUrl(legajo, 200);
+  const ini = escHtml(avSafe(e['Nombre']||''));
+  const fotoHtml = foto
+    ? `<img src="${foto}" alt="" style="width:96px;height:96px;border-radius:18px;object-fit:cover;border:1px solid var(--border)" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'ficha-ini',textContent:'${ini}'}))">`
+    : `<div class="ficha-ini">${ini}</div>`;
+  const chip = (txt, color) => `<span class="ficha-chip" style="color:${color};background:${color}14;border-color:${color}33">${txt}</span>`;
+  const chips = [
+    enPrueba ? chip('En período de prueba hasta el ' + fF(finPrueba), '#B45309') : '',
+    hito ? chip(`Cumple ${prox} años el ${fF(fechaProx)}`, '#002E9D') : '',
+    liq && liq.variables.some(v => v.usado > 0) ? chip('Tiene variables habituales', '#0F7B4A') : '',
+  ].join('');
+  const dato = (l, v) => `<div class="ficha-dato"><div class="klbl">${l}</div><div>${v}</div></div>`;
+  const kpi = (cls, l, v, sub) => `<div class="kcard ${cls}"><div class="klbl">${l}</div><div class="kval">${v}</div>${sub?`<div style="font-size:11.5px;color:var(--dim);margin-top:6px">${sub}</div>`:''}</div>`;
+  const compSector = delSector.size > 1 ? (diasAusTot > promSector*1.5 && diasAusTot - promSector >= 2 ? `<span style="color:var(--d)">Por encima del promedio del sector (${promSector.toFixed(1)})</span>` : `Promedio del sector: ${promSector.toFixed(1)}`) : '';
+  const barras = (obj, color) => { const arr = Object.entries(obj).sort((a,b)=>b[1]-a[1]); const max = arr.length ? arr[0][1] : 1;
+    return arr.map(([k,v]) => `<div style="display:grid;grid-template-columns:130px 1fr 52px;gap:10px;align-items:center;font-size:12.5px;margin:7px 0"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(k)}</span><div class="pbar"><div class="pfill" style="width:${Math.max(4,v/max*100)}%;background:${color}"></div></div><strong style="text-align:right">${v} d</strong></div>`).join(''); };
+  const vacio = t => `<div style="color:var(--dim);font-size:13px;padding:6px 0">${t}</div>`;
+
+  const ausHtml = `<div class="cc"><div class="ct">Ausencias · últimos 12 meses</div><div class="cs">${misAus.length} ${misAus.length===1?'ausencia':'ausencias'} · ${diasAusTot} días</div>
+    ${misAus.length ? barras(ausMotivo, 'var(--a)') + `<table style="margin-top:12px"><thead><tr><th>Desde</th><th>Hasta</th><th>Motivo</th><th>Días</th></tr></thead><tbody>${misAus.slice(0,6).map(r=>`<tr><td>${formatFecha(r.inicio)}</td><td>${formatFecha(r.fin)}</td><td>${escHtml(r.motivo)}</td><td>${r.dias}</td></tr>`).join('')}</tbody></table>` : vacio('Sin ausencias cargadas en los últimos 12 meses.')}</div>`;
+  const licMot = {}; misLic.forEach(r => { licMot[r.motivo] = (licMot[r.motivo]||0) + r.dias; });
+  const licHtml = `<div class="cc"><div class="ct">Licencias</div><div class="cs">${misLic.length} ${misLic.length===1?'licencia':'licencias'} en el historial · ${licDias} días</div>
+    ${misLic.length ? barras(licMot, 'var(--b)') + `<table style="margin-top:12px"><thead><tr><th>Inicio</th><th>Motivo</th><th>Días</th></tr></thead><tbody>${misLic.slice(0,6).map(r=>`<tr><td>${formatFecha(r.inicio)}</td><td>${escHtml(r.motivo)}${r.obs?`<div style="font-size:11px;color:var(--dim)">${escHtml(r.obs.slice(0,80))}</div>`:''}</td><td>${r.dias}</td></tr>`).join('')}</tbody></table>` : vacio('Sin licencias cargadas.')}</div>`;
+
+  let sueldoHtml = '', liqHtml = '';
+  if(esAdmin){
+    const ultimo = serie.length ? serie[serie.length-1] : null;
+    const habituales = liq ? liq.variables.filter(v => v.usado > 0) : [];
+    sueldoHtml = `<div class="cc"><div class="ct">Sueldo bruto por mes</div><div class="cs">Fijos, variables y no remunerativos (sin viáticos excluidos)</div>
+      ${serie.length ? `<div style="height:190px"><canvas id="ficha-ch-sueldo"></canvas></div>
+        <div style="font-size:12.5px;margin-top:12px"><div class="klbl" style="margin-bottom:6px">Variables habituales</div>${habituales.length ? habituales.map(v=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)"><span>${escHtml(v.concepto)}</span><strong>${fichaPesos(v.usado)}</strong></div>`).join('') : '<span style="color:var(--dim)">No tiene variables cobradas en 6 o más meses.</span>'}</div>`
+        : vacio(errSueldo ? 'No se pudieron traer los sueldos: ' + escHtml(errSueldo) : 'No hay sueldos cargados de esta persona.')}</div>`;
+    liqHtml = `<div class="cc"><div class="ct">Liquidación final estimada · si fuera hoy</div><div class="cs">Sin preaviso otorgado y sin vacaciones gozadas este año. Para ajustar, abrila en Liquidación final.</div>
+      ${liq ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:6px 0 14px">
+          <div class="ficha-monto"><div class="klbl">Despido sin causa</div><div style="color:var(--a)">${fichaPesos(liq.escenarios.sinCausa)}</div></div>
+          <div class="ficha-monto"><div class="klbl">Con causa o renuncia</div><div>${fichaPesos(liq.escenarios.conCausa)}</div></div></div>
+        <div style="font-size:12.5px;color:var(--mid);line-height:1.7">Base indemnizatoria ${fichaPesos(liq.base)}${liq.topeAplicado ? ` · topeada a ${fichaPesos(liq.baseTopeada)}` : ''} · ${liq.antig.aniosIndemn} ${liq.antig.aniosIndemn===1?'año':'años'} para el art. 245 · preaviso ${liq.mesesPreaviso} ${liq.mesesPreaviso===1?'mes':'meses'}</div>
+        ${liq.notas.length ? `<div style="font-size:11.5px;color:var(--w);margin-top:8px">${liq.notas.map(escHtml).join('<br>')}</div>` : ''}`
+        : vacio(errLiq ? escHtml(errLiq) : (errSueldo ? 'No disponible sin los sueldos.' : 'No disponible.'))}
+      <button class="btn bts liq-noprint" style="margin-top:14px" onclick="fichaAbrirLiq('${escHtml(legajo)}')">Abrir en Liquidación final</button></div>`;
+  }
+
+  out.innerHTML = `
+  <div class="ficha-head">
+    ${fotoHtml}
+    <div style="flex:1;min-width:220px">
+      <h3 class="ficha-nombre">${escHtml(e['Nombre']||'-')}</h3>
+      <div style="color:var(--mid);font-size:13px;margin:2px 0 10px">Legajo ${escHtml(legajo)} · ${escHtml(e['Sector']||'-')} · ${escHtml(e['Tarea']||'-')}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap"><span class="pill ${convPill(e['Convenio'])}">${escHtml(e['Convenio']||'-')}</span><span class="pill pgy">${escHtml(e['Ubicación']||e['Ubicacion']||'-')}</span>${chips}</div>
+    </div>
+  </div>
+  <div class="ficha-datos">
+    ${dato('Ingreso', formatFecha(e['Fecha Ingreso']))}${dato('Antigüedad', antTxt)}${dato('Horario', escHtml(e['HORARIO']||'-'))}
+    ${dato('Categoría', escHtml(e['Categoria']||'-'))}${dato('Vacaciones ' + hoy.getFullYear(), vacAnio + ' días por antigüedad')}${dato('Preaviso que le corresponde', aniosHoy > 5 ? '2 meses' : (enPrueba ? 'No corresponde (prueba)' : '1 mes'))}
+  </div>
+  <div class="kgrid">
+    ${kpi('kw','Días de ausencia (12 meses)', diasAusTot, compSector)}
+    ${kpi('kb','Días de licencia (12 meses)', licDias12, `${licDias} en todo el historial`)}
+    ${esAdmin ? kpi('ka','Último sueldo bruto', serie.length ? fichaPesos(serie[serie.length-1].total) : '-', serie.length ? 'Mes ' + serie[serie.length-1].mes : '') : ''}
+    ${esAdmin ? kpi('kd','Sin causa, si fuera hoy', liq ? fichaPesos(liq.escenarios.sinCausa) : '-', liq ? 'Estimación' : '') : ''}
+  </div>
+  <div class="cgrid">${ausHtml}${licHtml}${sueldoHtml}${liqHtml}</div>
+  <div style="font-size:11px;color:var(--dim);margin-top:10px">Información confidencial de uso interno de RRHH (Ley 25.326 de protección de datos personales).</div>`;
+
+  if(serie.length && document.getElementById('ficha-ch-sueldo')){
+    if(charts.fichaSueldo) charts.fichaSueldo.destroy();
+    charts.fichaSueldo = new Chart(document.getElementById('ficha-ch-sueldo'), { type:'line',
+      data:{ labels: serie.map(s => { const [y,m] = s.mes.split('-'); return new Date(+y, +m-1, 1).toLocaleDateString('es-AR',{month:'short',year:'2-digit'}); }),
+        datasets:[{ data: serie.map(s => Math.round(s.total)), borderColor:'#002E9D', backgroundColor:'rgba(0,46,157,.08)', fill:true, cubicInterpolationMode:'monotone', pointRadius:3, pointBackgroundColor:'#002E9D' }] },
+      options:{ maintainAspectRatio:false, plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label: c => fichaPesos(c.parsed.y) } } },
+        scales:{ x:{ ticks:{color:'#5B6474'}, grid:{display:false} }, y:{ ticks:{ color:'#5B6474', callback: v => '$' + (v/1e6).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' M', maxTicksLimit:5 }, grid:{color:'#E3E8F2'} } } } });
+  }
+}
+
+function fichaAbrirLiq(legajo){
+  const e = (employees||[]).find(x => String(x['Legajo']||'').trim() === legajo);
+  const btn = [...document.querySelectorAll('button.sb-tab')].find(b => (b.getAttribute('onclick')||'').includes("'Liquidación final'"));
+  if(!btn || !e) return;
+  switchTab(btn, 'Liquidación final');
+  const esperar = setInterval(() => {
+    const inp = document.getElementById('liq-emp');
+    if(inp){ clearInterval(esperar); inp.value = `${legajo} — ${e['Nombre']||''}`; liqCalcular(); }
+  }, 150);
+  setTimeout(() => clearInterval(esperar), 10000);
 }
 
 function filterNom(q){
@@ -3360,7 +3533,7 @@ function inicioVer(id){ inicioSel = inicioSel === id ? null : id; inicioRender()
 function inicioDetalle(){
   const D = inicioDatos; if(!D || !inicioSel) return '';
   const fila = (cols) => `<tr>${cols.map((c,i)=>`<td style="${i>=cols.length-1?'':''}">${c}</td>`).join('')}</tr>`;
-  const persona = (e) => `<strong>${escHtml(e['Nombre']||'')}</strong><div style="font-size:11px;color:var(--dim)">Legajo ${escHtml(String(e['Legajo']))} · ${escHtml(e['Sector']||'')} · ${escHtml(e['Ubicación']||'')}</div>`;
+  const persona = (e) => `<strong style="cursor:pointer;color:var(--a)" title="Ver ficha 360" onclick="showFichaEmpleado('${escHtml(String(e['Legajo']).trim())}')">${escHtml(e['Nombre']||'')}</strong><div style="font-size:11px;color:var(--dim)">Legajo ${escHtml(String(e['Legajo']))} · ${escHtml(e['Sector']||'')} · ${escHtml(e['Ubicación']||'')}</div>`;
   const tabla = (titulo, nota, cab, filas) => `<div class="tcard"><div class="thead"><div><h3>${titulo}</h3><div style="font-size:12px;color:var(--dim);margin-top:2px">${nota}</div></div></div>
     <div style="overflow-x:auto"><table><thead><tr>${cab.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>${filas.join('') || `<tr><td colspan="${cab.length}" style="color:var(--dim)">Nada pendiente.</td></tr>`}</tbody></table></div></div>`;
   const plural = (n, s, p) => n === 1 ? s : p;
