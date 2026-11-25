@@ -158,6 +158,9 @@ body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--text);min
 .ct{font-family:'Poppins',sans-serif;font-size:13px;font-weight:700;margin-bottom:3px}
 .cs{font-size:11px;color:var(--dim);margin-bottom:14px}
 canvas{max-height:220px}
+#dash-sec canvas{max-height:none}
+#dash-sec .kgrid{grid-template-columns:repeat(3,1fr)}
+@media(max-width:768px){#dash-sec .kgrid{grid-template-columns:1fr 1fr}}
 
 /* TABLE */
 .tcard{background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:0 1px 2px rgba(16,24,40,.04);overflow:hidden;margin-bottom:20px}
@@ -727,88 +730,221 @@ function renderTab(tab){
 // ═══════════════════════════════════════════════════════════════
 // ANALYST TABS
 // ═══════════════════════════════════════════════════════════════
-function analystDash(el){
-  const empFull = filterBySucursal(getActiveEmployees());
-  const sucTit = sucursalTitle();
+// ═══════════════════════════════════════════════════════════════
+// DASHBOARD DE GESTIÓN — indicadores que se mueven, La Plata vs Moreno
+// ═══════════════════════════════════════════════════════════════
+const DASH_SEDES = { LP:{nombre:'La Plata', color:'#002E9D'}, MO:{nombre:'Moreno', color:'#5B7FD6'} };
+const dashSede = e => String(e['Ubicación']||e['Ubicacion']||'').toUpperCase().includes('MORENO') ? 'MO' : 'LP';
+const dashNum = n => Number(n||0).toLocaleString('es-AR');
+const dashPct = (n, dec=1) => Number(n||0).toLocaleString('es-AR',{minimumFractionDigits:dec,maximumFractionDigits:dec}) + '%';
+const dashMesTxt = k => { if(!k) return ''; const [y,m] = k.split('-').map(Number); return new Date(y, m-1, 1).toLocaleDateString('es-AR',{month:'long', year:'numeric'}); };
+const dashMesCorto = k => { const [y,m] = k.split('-').map(Number); return new Date(y, m-1, 1).toLocaleDateString('es-AR',{month:'short', year:'2-digit'}); };
+const dashMesKey = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+const dashAnios = n => { const t = Number(n||0).toLocaleString('es-AR',{maximumFractionDigits:1}); return t + (t === '1' ? ' año' : ' años'); };
+const dashMediana = arr => { if(!arr.length) return 0; const s = [...arr].sort((a,b)=>a-b), m = Math.floor(s.length/2); return s.length % 2 ? s[m] : (s[m-1]+s[m])/2; };
 
-  // Si el filtro no encuentra nadie, mostrar diagnóstico
-  if(empFull.length === 0 && role === 'analyst' && getUserSucursal()){
-    const muestra = [...new Set(getActiveEmployees().slice(0,5).map(e=>e['Ubicación']||'(vacío)'))];
-    el.innerHTML=`<div class="sec active">
-    <div class="sh"><div><h2>Dashboard General</h2><p>Sin datos para tu sucursal</p></div></div>
-    <div class="empty"><div class="em"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 13l2.5-7h13L21 13v6H3z"/><path d="M3 13h5l1.5 2.5h5L16 13h5"/></svg></div>
-    <p>No se encontraron empleados para la sucursal <strong>"${getUserSucursal()}"</strong>.</p>
-    <p style="font-size:12px;color:var(--mid);margin-top:8px">Valores de "Ubicación" en la nómina: <strong>${muestra.join(', ')}</strong></p>
-    <p style="font-size:12px;color:var(--dim);margin-top:4px">Verificá que el valor en la columna Sucursal de la hoja Usuarios coincida exactamente con el campo Ubicacion de la nómina.</p>
-    </div></div>`;
+// Número al final de cada barra horizontal (suma de las series apiladas)
+const dashEtiquetas = { id:'dashEtiquetas', afterDatasetsDraw(chart){
+  const {ctx, scales:{x}} = chart; const metas = chart.data.datasets.map((_,i)=>chart.getDatasetMeta(i)).filter(m=>!m.hidden);
+  if(!metas.length) return;
+  ctx.save(); ctx.font = '600 11px Poppins, sans-serif'; ctx.fillStyle = '#1F2937'; ctx.textBaseline = 'middle';
+  chart.data.labels.forEach((_, i) => {
+    const total = metas.reduce((s,m)=>s + (Number(chart.data.datasets[m.index].data[i])||0), 0);
+    if(!total) return;
+    const bar = metas[metas.length-1].data[i];
+    ctx.fillText(dashNum(total), x.getPixelForValue(total) + 6, bar.y);
+  });
+  ctx.restore();
+}};
+
+function dashTramo(a){ return a < 1 ? '0-1' : a < 2 ? '1-2' : a < 5 ? '2-5' : a < 10 ? '5-10' : a < 15 ? '10-15' : a < 20 ? '15-20' : '+20'; }
+const DASH_TRAMOS = ['0-1','1-2','2-5','5-10','10-15','15-20','+20'];
+function dashTurno(h){
+  const s = String(h||'').trim().toUpperCase();
+  if(!s) return 'Sin dato';
+  if(s.includes('ROTATIVO')) return 'Rotativo';
+  const m = s.match(/^(\d{1,2})[.:]/); if(!m) return 'Otro';
+  const hr = parseInt(m[1],10);
+  return hr < 12 ? 'Mañana' : hr < 20 ? 'Tarde' : 'Noche';
+}
+
+function analystDash(el){
+  const emp = filterBySucursal(getActiveEmployees());
+  const sucTit = sucursalTitle();
+  if(emp.length === 0){
+    el.innerHTML = `<div class="sec active"><div class="sh"><div><h2>Dashboard</h2><p>Sin datos para mostrar${sucTit}</p></div></div>
+      <div class="empty" style="padding:40px">No hay personas en la nómina para esta sede. Verificá que la columna Sucursal de la hoja Usuarios coincida con la Ubicación de la nómina.</div></div>`;
     return;
   }
+  el.innerHTML = `<div class="sec active" id="dash-sec">
+    <div class="sh"><div><h2>Dashboard</h2><p>Indicadores de gestión${sucTit} · nómina de ${dashNum(emp.length)} personas activas</p></div>
+      <button class="btn bts" onclick="ausenciasLoaded=false;licenciasLoaded=false;loadData().then(()=>renderTab('Dashboard'))">↻ Actualizar</button></div>
+    <div id="dash-out"><div style="display:flex;align-items:center;gap:14px;padding:30px"><div class="spinner"></div><span style="color:var(--mid)">Calculando indicadores...</span></div></div>
+  </div>`;
+  Promise.all([loadAusencias().catch(()=>{}), loadLicencias().catch(()=>{})]).then(() => {
+    if(!document.getElementById('dash-out')) return;
+    dashRender(emp);
+  });
+}
 
-  const emp = empFull;
-  const total = emp.length;
-  const sectors = [...new Set(emp.map(e=>e['Sector']))].filter(Boolean).length;
-  const convenios = countBy(emp,'Convenio');
-  const mF = emp.filter(e=>e['sexo']==='F').length;
-  const mM = emp.filter(e=>e['sexo']==='M').length;
-  const avgAntig = avg(emp.map(e=>calcAntig(e['Fecha Ingreso'])));
+function dashRender(emp){
+  const out = document.getElementById('dash-out');
+  const hoy = new Date();
+  const sedes = ['LP','MO'].filter(s => emp.some(e => dashSede(e) === s));
+  const ambas = sedes.length > 1;
+  const porLeg = {}; emp.forEach(e => { porLeg[fichaLegNorm(e['Legajo'])] = e; });
+  const base = {}; sedes.forEach(s => base[s] = emp.filter(e => dashSede(e) === s));
 
-  el.innerHTML=`<div class="sec active">
-  <div class="sh"><div><h2>Dashboard General</h2><p>Datos en tiempo real desde Google Sheets${sucTit} · ${total} registros cargados</p></div>
-    <button class="btn bts" onclick="loadData().then(()=>renderTab('Dashboard'))">↻ Actualizar</button>
-  </div>
-  <div class="ag alert">Datos cargados correctamente desde Google Sheets — ${total} empleados activos${sucTit}</div>
-  <div class="kgrid">
-    <div class="kcard ka"><div class="klbl">Headcount Total</div><div class="kval">${total}</div><span class="kchg cup">↑ Base activa</span></div>
-    <div class="kcard kc"><div class="klbl">Sectores</div><div class="kval">${sectors}</div><span class="kchg cne">Áreas activas</span></div>
-    <div class="kcard kb"><div class="klbl">Antigüedad Prom.</div><div class="kval">${avgAntig.toFixed(1)}a</div><span class="kchg cup">Plantel estable</span></div>
-    <div class="kcard kw"><div class="klbl">Fuera Convenio</div><div class="kval">${convenios['Fuera de Convenio']||0}</div><span class="kchg cne">Empleados FC</span></div>
-    <div class="kcard kd"><div class="klbl">Género F / M</div><div class="kval">${mF}/${mM}</div><span class="kchg cne">${total ? ((mF/total)*100).toFixed(0) : 0}% femenino</span></div>
-  </div>
-  <div class="cgrid">
-    <div class="cc"><div class="ct">Headcount por Convenio</div><div class="cs">Distribución del plantel</div><canvas id="ch-conv"></canvas></div>
-    <div class="cc"><div class="ct">Top 8 Sectores</div><div class="cs">Cantidad de empleados</div><canvas id="ch-sect"></canvas></div>
-  </div>
-  <div class="cgrid">
-    <div class="cc"><div class="ct">Distribución por Horario</div><div class="cs">Turnos activos</div><canvas id="ch-hor"></canvas></div>
-    <div class="cc"><div class="ct">Antigüedad del Plantel</div><div class="cs">Tramos en años</div><canvas id="ch-antig"></canvas></div>
-  </div></div>`;
+  // ── Antigüedad, ingresos y prueba
+  const antig = e => calcAntig(e['Fecha Ingreso']);
+  const ing = e => parseFecha(e['Fecha Ingreso']);
+  const mesActual = dashMesKey(hoy);
+  const mesAntKey = dashMesKey(new Date(hoy.getFullYear(), hoy.getMonth()-1, 1));
+  const hace12 = new Date(hoy.getFullYear()-1, hoy.getMonth(), hoy.getDate());
+  const hace6 = new Date(hoy.getFullYear(), hoy.getMonth()-6, hoy.getDate());
 
-  setTimeout(()=>{
-    // Convenio
-    const cv=convenios;
-    charts.conv=new Chart(document.getElementById('ch-conv'),{type:'doughnut',
-      data:{labels:Object.keys(cv),datasets:[{data:Object.values(cv),backgroundColor:['#002E9D','#5B7FD6','#0F7B4A','#D97706'],borderWidth:0,hoverOffset:5}]},
-      options:{plugins:{legend:{labels:{color:'#4B5563',font:{size:11}}}},cutout:'62%'}});
-
-    // Sectores top 8
-    const sc=countBy(emp,'Sector');
-    const top8=Object.entries(sc).sort((a,b)=>b[1]-a[1]).slice(0,8);
-    charts.sect=new Chart(document.getElementById('ch-sect'),{type:'bar',
-      data:{labels:top8.map(e=>e[0]),datasets:[{data:top8.map(e=>e[1]),backgroundColor:'rgba(0,46,157,.7)',borderRadius:5,borderSkipped:false}]},
-      options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#5B6474'},grid:{color:'#E3E8F2'}},y:{ticks:{color:'#5B6474',font:{size:10}},grid:{display:false}}}}});
-
-    // Horarios
-    const hor=countBy(emp,'HORARIO');
-    const topHor=Object.entries(hor).sort((a,b)=>b[1]-a[1]).slice(0,6);
-    charts.hor=new Chart(document.getElementById('ch-hor'),{type:'doughnut',
-      data:{labels:topHor.map(e=>e[0]),datasets:[{data:topHor.map(e=>e[1]),backgroundColor:['#002E9D','#5B7FD6','#0F7B4A','#D97706','#E81911','#5B6474'],borderWidth:0,hoverOffset:5}]},
-      options:{plugins:{legend:{labels:{color:'#4B5563',font:{size:10}}}},cutout:'58%'}});
-
-    // Antigüedad tramos
-    const tramos={' <1 año':0,'1-3 años':0,'3-5 años':0,'5-10 años':0,'10-20 años':0,'+20 años':0};
-    emp.forEach(e=>{
-      const a=calcAntig(e['Fecha Ingreso']);
-      if(a<1) tramos[' <1 año']++;
-      else if(a<3) tramos['1-3 años']++;
-      else if(a<5) tramos['3-5 años']++;
-      else if(a<10) tramos['5-10 años']++;
-      else if(a<20) tramos['10-20 años']++;
-      else tramos['+20 años']++;
+  // ── Ausentismo: último mes reportado y el anterior, mismo cálculo que la pestaña Ausentismo
+  const EXCL = ['ausencia justificada','perm. gremial'];
+  const filasAus = (ausenciasRaw||[]).filter(r => porLeg[fichaLegNorm(r['Legajo']||r['legajo'])]);
+  const mesesAus = [...new Set((ausenciasRaw||[]).map(r => { const m = String(r['Mes']||'').match(/(\d{4})-(\d{2})/); return m ? m[1]+'-'+m[2] : ''; }).filter(Boolean))].sort();
+  const ultMes = mesesAus[mesesAus.length-1] || '', antMes = mesesAus[mesesAus.length-2] || '';
+  const mesFila = r => { const m = String(r['Mes']||'').match(/(\d{4})-(\d{2})/); return m ? m[1]+'-'+m[2] : ''; };
+  function ausMes(sede, mes){
+    if(!mes) return null;
+    const [y,m] = mes.split('-').map(Number), diasMes = new Date(y, m, 0).getDate();
+    const hc = sede ? base[sede].length : emp.length;
+    let dias = 0; const pers = new Set(), sinAviso = new Set(); let diasSA = 0;
+    filasAus.forEach(r => {
+      if(mesFila(r) !== mes) return;
+      const e = porLeg[fichaLegNorm(r['Legajo']||r['legajo'])]; if(sede && dashSede(e) !== sede) return;
+      const mot = String(r['Motivo']||'').trim().toLowerCase();
+      const d = ausDiasEnMes(r['Fecha Inicio'], r['Fecha Fin'], y, m); if(!d) return;
+      if(mot === 'ausencia s/aviso'){ sinAviso.add(e['Legajo']); diasSA += d; }
+      if(EXCL.includes(mot)) return;
+      dias += d; pers.add(e['Legajo']);
     });
-    charts.antig=new Chart(document.getElementById('ch-antig'),{type:'bar',
-      data:{labels:Object.keys(tramos),datasets:[{data:Object.values(tramos),backgroundColor:['#E81911','#D97706','#002E9D','#5B7FD6','#0F7B4A','#4B5563'],borderRadius:5,borderSkipped:false}]},
-      options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#5B6474',font:{size:10}},grid:{display:false}},y:{ticks:{color:'#5B6474'},grid:{color:'#E3E8F2'}}}}});
-  },50);
+    return { dias, personas: pers.size, tasa: hc ? dias/(hc*diasMes)*100 : 0, sinAviso: sinAviso.size, diasSA };
+  }
+
+  // ── Licencias en curso (fecha de inicio + días cargados)
+  const licEnCurso = sede => (licenciasRaw||[]).filter(r => {
+    const e = porLeg[fichaLegNorm(r['legajo']||r['Legajo'])]; if(!e || (sede && dashSede(e) !== sede)) return false;
+    const i = ausFecha(r['fecha inicio']||r['Fecha Inicio']), d = parseInt(r['dias']||r['Dias']||0)||0;
+    if(!i || !d) return false;
+    const fin = new Date(i.getFullYear(), i.getMonth(), i.getDate() + d);
+    return i <= hoy && fin > hoy;
+  });
+
+  function resumen(sede){
+    const g = sede ? base[sede] : emp;
+    const an = g.map(antig);
+    return {
+      dot: g.length,
+      ingMes: g.filter(e => { const f = ing(e); return f && dashMesKey(f) === mesActual; }).length,
+      ingMesAnt: g.filter(e => { const f = ing(e); return f && dashMesKey(f) === mesAntKey; }).length,
+      ing12: g.filter(e => { const f = ing(e); return f && f > hace12; }).length,
+      prueba: g.filter(e => { const f = ing(e); return f && f > hace6; }).length,
+      mediana: dashMediana(an), promedio: avg(an),
+      fc: g.filter(e => String(e['Convenio']||'').toLowerCase().includes('fuera')).length,
+      aus: ausMes(sede, ultMes), ausAnt: ausMes(sede, antMes),
+      lic: licEnCurso(sede).length,
+    };
+  }
+  const T = resumen(null), S = {}; sedes.forEach(s => S[s] = resumen(s));
+
+  // ── Tarjetas con comparación contra el mes anterior
+  const flecha = (act, ant, subirEsMalo, fmt=dashNum, unidad='') => {
+    if(ant === null || ant === undefined) return '<span class="kchg cne">Sin mes anterior</span>';
+    const dif = act - ant;
+    if(Math.abs(dif) < 1e-9) return `<span class="kchg cne">Igual que el mes anterior</span>`;
+    const malo = subirEsMalo ? dif > 0 : dif < 0;
+    return `<span class="kchg" style="background:${malo?'rgba(232,25,17,.1)':'rgba(15,123,74,.1)'};color:${malo?'var(--d)':'var(--c)'}">${dif>0?'▲':'▼'} ${fmt(Math.abs(dif))}${unidad} vs. mes anterior</span>`;
+  };
+  const sub = t => `<div style="font-size:11.5px;color:var(--dim);margin-top:6px">${t}</div>`;
+  const porSede = f => ambas ? sub(sedes.map(s => `${DASH_SEDES[s].nombre} ${f(S[s])}`).join(' · ')) : '';
+  const tasaTxt = a => a ? dashPct(a.tasa, 2) : '-';
+  const kpis = `<div class="kgrid">
+    <div class="kcard ka"><div class="klbl">Dotación activa</div><div class="kval">${dashNum(T.dot)}</div>${porSede(s=>dashNum(s.dot))}</div>
+    <div class="kcard kd"><div class="klbl">Tasa de ausentismo · ${ultMes ? dashMesTxt(ultMes) : 'sin datos'}</div><div class="kval">${tasaTxt(T.aus)}</div>
+      ${T.aus && T.ausAnt ? flecha(T.aus.tasa, T.ausAnt.tasa, true, n => n.toLocaleString('es-AR',{maximumFractionDigits:2}), ' pp') : ''}${porSede(s=>tasaTxt(s.aus))}</div>
+    <div class="kcard kw"><div class="klbl">Ausencias sin aviso · ${ultMes ? dashMesTxt(ultMes) : '-'}</div><div class="kval">${T.aus ? dashNum(T.aus.sinAviso) : '-'} <span style="font-size:13px;color:var(--dim);font-weight:500">personas</span></div>
+      ${T.aus && T.ausAnt ? flecha(T.aus.sinAviso, T.ausAnt.sinAviso, true) : ''}${porSede(s=>s.aus?dashNum(s.aus.sinAviso):'-')}</div>
+    <div class="kcard kb"><div class="klbl">Ingresos en lo que va de ${dashMesTxt(mesActual).split(' ')[0]}</div><div class="kval">${dashNum(T.ingMes)}</div>
+      ${sub(`${dashNum(T.ingMesAnt)} en ${dashMesTxt(mesAntKey).split(' ')[0]} · ${dashNum(T.ing12)} en los últimos 12 meses`)}</div>
+    <div class="kcard kc"><div class="klbl">En período de prueba</div><div class="kval">${dashNum(T.prueba)}</div>${sub('Ingresaron hace menos de 6 meses')}${porSede(s=>dashNum(s.prueba))}</div>
+    <div class="kcard kb"><div class="klbl">Licencias en curso</div><div class="kval">${dashNum(T.lic)}</div>${sub('Según la fecha de inicio y los días cargados en Licencias')}</div>
+  </div>`;
+
+  // ── La Plata vs Moreno
+  const comp = !ambas ? '' : (() => {
+    const fila = (lbl, f, nota='') => `<tr><td>${lbl}${nota?`<div style="font-size:11px;color:var(--dim)">${nota}</div>`:''}</td>${sedes.map(s=>`<td style="text-align:right;font-weight:600">${f(S[s])}</td>`).join('')}<td style="text-align:right;color:var(--mid)">${f(T)}</td></tr>`;
+    return `<div class="tcard" style="margin-bottom:16px"><div class="thead"><h3>La Plata y Moreno</h3><span style="font-size:12px;color:var(--dim)">Ausentismo: reporte de ${dashMesTxt(ultMes)}</span></div>
+      <div style="overflow-x:auto"><table><thead><tr><th>Indicador</th>${sedes.map(s=>`<th style="text-align:right">${DASH_SEDES[s].nombre}</th>`).join('')}<th style="text-align:right">Total</th></tr></thead><tbody>
+      ${fila('Dotación activa', s=>dashNum(s.dot))}
+      ${fila('Peso sobre el total', s=>dashPct(s.dot/T.dot*100,0))}
+      ${fila('Tasa de ausentismo', s=>tasaTxt(s.aus), 'Sin ausencias justificadas ni permisos gremiales')}
+      ${fila('Personas con alguna ausencia', s=>s.aus?dashNum(s.aus.personas)+' ('+dashPct(s.aus.personas/s.dot*100,0)+')':'-')}
+      ${fila('Personas con ausencias sin aviso', s=>s.aus?dashNum(s.aus.sinAviso):'-')}
+      ${fila('Licencias en curso', s=>dashNum(s.lic))}
+      ${fila('Ingresos de los últimos 12 meses', s=>dashNum(s.ing12)+' ('+dashPct(s.ing12/s.dot*100,0)+')', 'Solo quienes siguen activos')}
+      ${fila('En período de prueba', s=>dashNum(s.prueba))}
+      ${fila('Antigüedad mediana', s=>dashAnios(s.mediana), 'La mitad del plantel tiene menos que esto')}
+      ${fila('Antigüedad promedio', s=>dashAnios(s.promedio))}
+      ${fila('Fuera de convenio', s=>dashNum(s.fc)+' ('+dashPct(s.fc/s.dot*100,0)+')')}
+      </tbody></table></div></div>`;
+  })();
+
+  const nSect = new Set(emp.map(e=>String(e['Sector']||'Sin dato').trim())).size;
+  out.innerHTML = `${kpis}${comp}
+  <div class="cgrid">
+    <div class="cc"><div class="ct">Tasa de ausentismo por mes</div><div class="cs">Días de ausencia sobre días disponibles, según cada reporte mensual</div><div style="height:240px"><canvas id="ch-d-aus"></canvas></div></div>
+    <div class="cc"><div class="ct">Ingresos por mes</div><div class="cs">Últimos 12 meses · solo personas que siguen activas</div><div style="height:240px"><canvas id="ch-d-ing"></canvas></div></div>
+  </div>
+  <div class="cgrid">
+    <div class="cc"><div class="ct">Antigüedad del plantel</div><div class="cs">Mediana ${dashAnios(T.mediana)} · promedio ${dashAnios(T.promedio)}</div><div style="height:240px"><canvas id="ch-d-antig"></canvas></div></div>
+    <div class="cc"><div class="ct">Turnos</div><div class="cs">Agrupados por hora de entrada</div><div style="height:240px"><canvas id="ch-d-turno"></canvas></div></div>
+  </div>
+  <div class="cgrid"><div class="cc" style="grid-column:1/-1"><div class="ct">Personas por sector</div><div class="cs">Los ${nSect} sectores${ambas?', divididos por sede':''}</div><div style="height:${Math.max(220, nSect*26+50)}px"><canvas id="ch-d-sect"></canvas></div></div></div>`;
+
+  const grid = '#E3E8F2', tick = '#5B6474';
+  const leyenda = ambas ? {display:true, position:'bottom', labels:{color:'#4B5563', boxWidth:12, font:{size:11}}} : {display:false};
+  const dsSede = (fnData, extra={}) => sedes.map(s => ({ label: DASH_SEDES[s].nombre, data: fnData(s), backgroundColor: DASH_SEDES[s].color, borderColor: DASH_SEDES[s].color, borderRadius:4, ...extra }));
+  ['dAus','dIng','dAntig','dTurno','dSect'].forEach(k => { if(charts[k]) { charts[k].destroy(); delete charts[k]; } });
+
+  // Ausentismo por mes y sede
+  const mesesG = mesesAus.slice(-7);
+  if(mesesG.length){
+    charts.dAus = new Chart(document.getElementById('ch-d-aus'), { type:'line',
+      data:{ labels: mesesG.map(dashMesCorto), datasets: dsSede(s => mesesG.map(m => { const a = ausMes(s, m); return a ? +a.tasa.toFixed(2) : null; }), { tension:0, pointRadius:3, fill:false, borderWidth:2 }) },
+      options:{ maintainAspectRatio:false, plugins:{ legend: leyenda, tooltip:{ callbacks:{ label: c => `${c.dataset.label}: ${dashPct(c.parsed.y,2)}` } } },
+        scales:{ x:{ ticks:{color:tick}, grid:{display:false} }, y:{ beginAtZero:true, ticks:{ color:tick, callback: v => v + '%' }, grid:{color:grid} } } } });
+  } else document.getElementById('ch-d-aus').outerHTML = '<div style="color:var(--dim);padding:20px">No hay datos de ausentismo cargados.</div>';
+
+  // Ingresos por mes
+  const meses12 = []; for(let i=11;i>=0;i--) meses12.push(dashMesKey(new Date(hoy.getFullYear(), hoy.getMonth()-i, 1)));
+  charts.dIng = new Chart(document.getElementById('ch-d-ing'), { type:'bar',
+    data:{ labels: meses12.map(dashMesCorto), datasets: dsSede(s => meses12.map(m => base[s].filter(e => { const f = ing(e); return f && dashMesKey(f) === m; }).length)) },
+    options:{ maintainAspectRatio:false, plugins:{ legend: leyenda }, scales:{ x:{ stacked:true, ticks:{color:tick}, grid:{display:false} }, y:{ stacked:true, beginAtZero:true, ticks:{color:tick, precision:0}, grid:{color:grid} } } } });
+
+  // Antigüedad con tramos
+  charts.dAntig = new Chart(document.getElementById('ch-d-antig'), { type:'bar',
+    data:{ labels: DASH_TRAMOS.map(t => t + ' años'), datasets: dsSede(s => DASH_TRAMOS.map(t => base[s].filter(e => dashTramo(antig(e)) === t).length)) },
+    options:{ maintainAspectRatio:false, plugins:{ legend: leyenda }, scales:{ x:{ stacked:true, ticks:{color:tick}, grid:{display:false} }, y:{ stacked:true, beginAtZero:true, ticks:{color:tick, precision:0}, grid:{color:grid} } } } });
+
+  // Turnos
+  const TURNOS = ['Mañana','Tarde','Noche','Rotativo','Otro','Sin dato'].filter(t => emp.some(e => dashTurno(e['HORARIO']) === t));
+  charts.dTurno = new Chart(document.getElementById('ch-d-turno'), { type:'bar', plugins:[dashEtiquetas],
+    data:{ labels: TURNOS, datasets: dsSede(s => TURNOS.map(t => base[s].filter(e => dashTurno(e['HORARIO']) === t).length)) },
+    options:{ indexAxis:'y', maintainAspectRatio:false, layout:{padding:{right:40}}, plugins:{ legend: leyenda },
+      scales:{ x:{ stacked:true, beginAtZero:true, ticks:{color:tick, precision:0}, grid:{color:grid} }, y:{ stacked:true, ticks:{color:'#1F2937'}, grid:{display:false} } } } });
+
+  // Sectores
+  const cuenta = {}; emp.forEach(e => { const k = String(e['Sector']||'Sin dato').trim(); cuenta[k] = (cuenta[k]||0) + 1; });
+  const sects = Object.keys(cuenta).sort((a,b) => cuenta[b] - cuenta[a]);
+  charts.dSect = new Chart(document.getElementById('ch-d-sect'), { type:'bar', plugins:[dashEtiquetas],
+    data:{ labels: sects, datasets: dsSede(s => sects.map(k => base[s].filter(e => String(e['Sector']||'Sin dato').trim() === k).length)) },
+    options:{ indexAxis:'y', maintainAspectRatio:false, layout:{padding:{right:40}}, plugins:{ legend: leyenda },
+      scales:{ x:{ stacked:true, beginAtZero:true, ticks:{color:tick, precision:0}, grid:{color:grid} }, y:{ stacked:true, ticks:{color:'#1F2937', font:{size:11}, autoSkip:false}, grid:{display:false} } } } });
 }
 
 function nominaTab(el){
