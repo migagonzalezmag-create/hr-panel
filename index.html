@@ -979,18 +979,38 @@ async function fichaRender(legajo){
   const ln = fichaLegNorm(legajo);
   const ing = parseFecha(e['Fecha Ingreso']);
 
-  // Ausencias (últimos 12 meses): días = fin - inicio, igual que la pestaña Ausentismo
-  const diasAus = r => { const a = parseFecha(r['Fecha Inicio']||r['fecha inicio']), b = parseFecha(r['Fecha Fin']||r['fecha fin']); if(!a||!b) return 0;
-    const ini = a < desde12 ? desde12 : a, fin = b > hoy ? hoy : b; return Math.max(0, Math.round((fin-ini)/fichaDia)); };
-  const aus12 = (ausenciasRaw||[]).filter(r => { const f = parseFecha(r['Fecha Fin']||r['fecha fin']||r['Fecha Inicio']); return f && f >= desde12; });
-  const misAus = aus12.filter(r => fichaLegNorm(r['Legajo']||r['legajo']) === ln).map(r => ({ inicio:r['Fecha Inicio']||r['fecha inicio'], fin:r['Fecha Fin']||r['fecha fin'], motivo:String(r['Motivo']||r['motivo']||'Sin dato').trim(), dias:diasAus(r) }))
-    .sort((a,b) => (parseFecha(b.inicio)||0) - (parseFecha(a.inicio)||0));
-  const diasAusTot = misAus.reduce((s,r)=>s+r.dias,0);
+  // Ausencias (últimos 12 meses). El reporte del sistema es mensual: una ausencia larga aparece una vez por mes,
+  // con la misma fecha de inicio y la fecha de fin prevista a ese momento. Por eso cada fila cuenta solo los días
+  // de su propio mes (igual que la pestaña Ausentismo) y en la lista se agrupa en un solo evento.
+  const NO_CUENTA = ['ausencia justificada','perm. gremial'];      // igual que la tasa de la pestaña Ausentismo
+  const mesDesde = (() => { const d = new Date(hoy.getFullYear(), hoy.getMonth() - 11, 1); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); })();
+  const mesDe = r => { const m = String(r['Mes']||r['mes']||'').match(/(\d{4})-(\d{2})/); return m ? m[1] + '-' + m[2] : ''; };
+  const diasFila = r => { const m = mesDe(r); if(!m) return 0; const [y, mm] = m.split('-').map(Number); return ausDiasEnMes(r['Fecha Inicio']||r['fecha inicio'], r['Fecha Fin']||r['fecha fin'], y, mm); };
+  const motDe = r => String(r['Motivo']||r['motivo']||'Sin dato').trim();
+  const aus12 = (ausenciasRaw||[]).filter(r => mesDe(r) >= mesDesde);
+  const eventos = {};
+  aus12.filter(r => fichaLegNorm(r['Legajo']||r['legajo']) === ln).forEach(r => {
+    const ini = ausFecha(r['Fecha Inicio']||r['fecha inicio']); if(!ini) return;
+    const k = motDe(r) + '|' + ini.toDateString();
+    const d = diasFila(r), mes = mesDe(r);
+    if(!eventos[k]) eventos[k] = { inicio: ini, fin: null, motivo: motDe(r), dias: 0, mes: '' };
+    const ev = eventos[k]; ev.dias += d;
+    if(mes >= ev.mes){ ev.mes = mes; ev.fin = ausFecha(r['Fecha Fin']||r['fecha fin']); }
+  });
+  const misAus = Object.values(eventos).map(ev => {
+    const [y, m] = ev.mes.split('-').map(Number);
+    ev.enCurso = ev.fin && ev.fin >= new Date(y, m, 1);     // la fecha de fin pasa el último mes reportado
+    ev.cuenta = !NO_CUENTA.includes(ev.motivo.toLowerCase());
+    return ev;
+  }).sort((a,b) => b.inicio - a.inicio);
+  const diasAusTot = misAus.filter(ev => ev.cuenta).reduce((s,ev)=>s+ev.dias,0);
   const sector = String(e['Sector']||'').trim();
   const delSector = new Set((employees||[]).filter(x => String(x['Sector']||'').trim() === sector).map(x => fichaLegNorm(x['Legajo'])));
-  const diasSector = aus12.filter(r => delSector.has(fichaLegNorm(r['Legajo']||r['legajo']))).reduce((s,r)=>s+diasAus(r),0);
+  const diasSector = aus12.filter(r => delSector.has(fichaLegNorm(r['Legajo']||r['legajo'])) && !NO_CUENTA.includes(motDe(r).toLowerCase())).reduce((s,r)=>s+diasFila(r),0);
   const promSector = delSector.size ? diasSector / delSector.size : 0;
-  const ausMotivo = {}; misAus.forEach(r => { ausMotivo[r.motivo] = (ausMotivo[r.motivo]||0) + r.dias; });
+  const ausMotivo = {}; misAus.forEach(ev => { ausMotivo[ev.motivo] = (ausMotivo[ev.motivo]||0) + ev.dias; });
+  const ultimoReporte = (ausenciasRaw||[]).reduce((mx, r) => { const m = mesDe(r); return m > mx ? m : mx; }, '');
+  const mesTxt = k => { if(!k) return ''; const [y,m] = k.split('-').map(Number); return new Date(y, m-1, 1).toLocaleDateString('es-AR',{month:'short', year:'numeric'}); };
 
   // Licencias (todo el historial cargado)
   const misLic = (licenciasRaw||[]).filter(r => fichaLegNorm(r['legajo']||r['Legajo']) === ln).map(r => ({ inicio:r['fecha inicio']||r['Fecha Inicio']||'', dias:parseInt(r['dias']||r['Dias']||0)||0, motivo:String(r['motivo']||r['Motivo']||'Sin dato').trim(), obs:String(r['Observacion']||r['observacion']||'').trim() }))
@@ -1039,8 +1059,9 @@ async function fichaRender(legajo){
     return arr.map(([k,v]) => `<div style="display:grid;grid-template-columns:130px 1fr 52px;gap:10px;align-items:center;font-size:12.5px;margin:7px 0"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(k)}</span><div class="pbar"><div class="pfill" style="width:${Math.max(4,v/max*100)}%;background:${color}"></div></div><strong style="text-align:right">${v} d</strong></div>`).join(''); };
   const vacio = t => `<div style="color:var(--dim);font-size:13px;padding:6px 0">${t}</div>`;
 
-  const ausHtml = `<div class="cc"><div class="ct">Ausencias · últimos 12 meses</div><div class="cs">${misAus.length} ${misAus.length===1?'ausencia':'ausencias'} · ${diasAusTot} días</div>
-    ${misAus.length ? barras(ausMotivo, 'var(--a)') + `<table style="margin-top:12px"><thead><tr><th>Desde</th><th>Hasta</th><th>Motivo</th><th>Días</th></tr></thead><tbody>${misAus.slice(0,6).map(r=>`<tr><td>${formatFecha(r.inicio)}</td><td>${formatFecha(r.fin)}</td><td>${escHtml(r.motivo)}</td><td>${r.dias}</td></tr>`).join('')}</tbody></table>` : vacio('Sin ausencias cargadas en los últimos 12 meses.')}</div>`;
+  const filaAus = ev => `<tr${ev.cuenta?'':' style="color:var(--dim)"'}><td>${fF(ev.inicio)}</td><td>${ev.enCurso ? `<span style="color:var(--w);font-weight:600">Sigue</span><div style="font-size:11px;color:var(--dim)">fin previsto ${fF(ev.fin)}</div>` : fF(ev.fin)}</td><td>${escHtml(ev.motivo)}${ev.cuenta?'':'<div style="font-size:11px">No suma en la tasa</div>'}</td><td>${ev.dias}</td></tr>`;
+  const ausHtml = `<div class="cc"><div class="ct">Ausencias · últimos 12 meses</div><div class="cs">${misAus.length} ${misAus.length===1?'ausencia':'ausencias'} · ${misAus.reduce((s,ev)=>s+ev.dias,0)} días hasta el reporte de ${mesTxt(ultimoReporte)}</div>
+    ${misAus.length ? barras(ausMotivo, 'var(--a)') + `<table style="margin-top:12px"><thead><tr><th>Desde</th><th>Hasta</th><th>Motivo</th><th>Días</th></tr></thead><tbody>${misAus.slice(0,8).map(filaAus).join('')}</tbody></table>${misAus.length > 8 ? `<div style="font-size:11.5px;color:var(--dim);margin-top:8px">Y ${misAus.length-8} más en el año.</div>` : ''}` : vacio('Sin ausencias cargadas en los últimos 12 meses.')}</div>`;
   const licMot = {}; misLic.forEach(r => { licMot[r.motivo] = (licMot[r.motivo]||0) + r.dias; });
   const licHtml = `<div class="cc"><div class="ct">Licencias</div><div class="cs">${misLic.length} ${misLic.length===1?'licencia':'licencias'} en el historial · ${licDias} días</div>
     ${misLic.length ? barras(licMot, 'var(--b)') + `<table style="margin-top:12px"><thead><tr><th>Inicio</th><th>Motivo</th><th>Días</th></tr></thead><tbody>${misLic.slice(0,6).map(r=>`<tr><td>${formatFecha(r.inicio)}</td><td>${escHtml(r.motivo)}${r.obs?`<div style="font-size:11px;color:var(--dim)">${escHtml(r.obs.slice(0,80))}</div>`:''}</td><td>${r.dias}</td></tr>`).join('')}</tbody></table>` : vacio('Sin licencias cargadas.')}</div>`;
@@ -1077,7 +1098,7 @@ async function fichaRender(legajo){
     ${dato('Categoría', escHtml(e['Categoria']||'-'))}${dato('Vacaciones ' + hoy.getFullYear(), vacAnio + ' días por antigüedad')}${dato('Preaviso que le corresponde', aniosHoy > 5 ? '2 meses' : (enPrueba ? 'No corresponde (prueba)' : '1 mes'))}
   </div>
   <div class="kgrid">
-    ${kpi('kw','Días de ausencia (12 meses)', diasAusTot, compSector)}
+    ${kpi('kw','Días de ausencia (12 meses)', diasAusTot, compSector || 'Sin ausencias justificadas ni permisos gremiales')}
     ${kpi('kb','Días de licencia (12 meses)', licDias12, `${licDias} en todo el historial`)}
     ${esAdmin ? kpi('ka','Último sueldo bruto', serie.length ? fichaPesos(serie[serie.length-1].total) : '-', serie.length ? 'Mes ' + serie[serie.length-1].mes : '') : ''}
     ${esAdmin ? kpi('kd','Sin causa, si fuera hoy', liq ? fichaPesos(liq.escenarios.sinCausa) : '-', liq ? 'Estimación' : '') : ''}
@@ -1535,6 +1556,18 @@ async function loadAusencias(){
   ausenciasLoaded = false;
 }
 
+// Días de una ausencia dentro de un mes. Fecha Fin es inclusiva: del 6/6 al 12/6 son 7 días y una ausencia de un día (inicio = fin) cuenta 1.
+function ausFecha(v){ if(v instanceof Date) return v; const f = parseFecha(v); if(f) return f; const d = new Date(v); return isNaN(d) ? null : d; }
+function ausDiasEnMes(fIni, fFin, anio, mes){
+  const d1 = ausFecha(fIni), d2 = ausFecha(fFin);
+  if(!d1 || !d2) return 0;
+  const ini = new Date(d1.getFullYear(), d1.getMonth(), d1.getDate());
+  const finExcl = new Date(d2.getFullYear(), d2.getMonth(), d2.getDate() + 1);
+  const mStart = new Date(anio, mes-1, 1), mEnd = new Date(anio, mes, 1);
+  const start = ini > mStart ? ini : mStart, end = finExcl < mEnd ? finExcl : mEnd;
+  return Math.max(Math.round((end - start) / 86400000), 0);
+}
+
 function procesarAusenciasRaw(raw, excluir, headcountOverride=null){
   const filtered = raw.filter(r => {
     const mot = String(r['Motivo']||r['motivo']||'').trim();
@@ -1561,16 +1594,7 @@ function procesarAusenciasRaw(raw, excluir, headcountOverride=null){
 
   const mesesOrdenados = Object.keys(porMesMap).sort();
 
-  const diasEnMes = (fIni, fFin, anio, mes) => {
-    if(!fIni || !fFin) return 0;
-    const d1 = new Date(fIni), d2 = new Date(fFin);
-    if(isNaN(d1)||isNaN(d2)) return 0;
-    const mStart = new Date(anio, mes-1, 1);
-    const mEnd = new Date(anio, mes, 1);
-    const start = new Date(Math.max(d1, mStart));
-    const end = new Date(Math.min(d2, mEnd));
-    return Math.max(Math.round((end-start)/(1000*60*60*24)), 0);
-  };
+  const diasEnMes = ausDiasEnMes;
 
   const headcount = headcountOverride || employees.length || 794;
   // Días reales de cada mes (la empresa trabaja los 7 días)
@@ -1764,13 +1788,7 @@ async function ausentismoTab(el, mesSeleccionado=null){
     });
     const [anio, mesNum] = mesSeleccionado.split('-').map(Number);
     const label = new Date(anio,mesNum-1,1).toLocaleDateString('es-AR',{month:'long',year:'numeric'});
-    const diasEnMes = (fIni, fFin) => {
-      if(!fIni||!fFin) return 0;
-      const d1=new Date(fIni),d2=new Date(fFin);
-      if(isNaN(d1)||isNaN(d2)) return 0;
-      const mS=new Date(anio,mesNum-1,1), mE=new Date(anio,mesNum,1);
-      return Math.max(Math.round((new Date(Math.min(d2,mE))-new Date(Math.max(d1,mS)))/(86400000)),0);
-    };
+    const diasEnMes = (fIni, fFin) => ausDiasEnMes(fIni, fFin, anio, mesNum);
     const empDet={}, motDet={}, critDet={};
     let totalD=0; const empsSet=new Set();
     filtered.forEach(r=>{
@@ -2057,7 +2075,7 @@ function procesarAusentismo(input){
         const mesInicio = new Date(anio, mes-1, 1);
         const mesFin = new Date(anio, mes, 1);
         const inicio = new Date(Math.max(fIni, mesInicio));
-        const fin = new Date(Math.min(fFin, mesFin));
+        const fin = new Date(Math.min(new Date(fFin.getFullYear(), fFin.getMonth(), fFin.getDate()+1), mesFin));
         const dias = Math.max(Math.round((fin-inicio)/(1000*60*60*24)),0);
         if(dias <= 0) return;
         totalDias += dias;
