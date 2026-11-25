@@ -434,7 +434,7 @@ function doLogout(){
   if(authToken){ api({ action: 'logout' }).catch(()=>{}); }
   authToken=null; borrarSesion();
   employees=[]; fotosMap={}; licencias=[]; licenciasLoaded=false; licenciasRaw=null; ausenciasRaw=[]; ausenciasLoaded=false; sueldos=[]; sueldosLoaded=false;
-  liqCfg=null; liqUltimo=null;
+  liqCfg=null; liqUltimo=null; inicioDatos=null; inicioSel=null; inicioVarCache=null;
   role=null; currentUser=null; novedades=[];
   destroyCharts();
   document.getElementById('app').style.display='none';
@@ -550,16 +550,17 @@ function calcAntig(fechaStr){
 
 // ─── BUILD APP ────────────────────────────────────────────────
 const ROLES = {
-  analyst:    {label:'Analista RRHH',    badge:'ba', tabs:['Dashboard','Nómina','Sectores','Antigüedad','Ausentismo','Licencias','Academia','Planificación Horaria']},
-  supervisor: {label:'Jefe / Supervisor', badge:'bs', tabs:['Nómina','Ausentismo','Licencias','Academia','Planificación Horaria']},
-  director:   {label:'Dirección',         badge:'bd', tabs:['Ejecutivo','Composición','Ausentismo','Sueldos','Nómina','Negociaciones','Academia','Planificación Horaria']},
-  admin:      {label:'Administrador',     badge:'bd', tabs:['Dashboard','Nómina','Sectores','Antigüedad','Ejecutivo','Composición','Ausentismo','Licencias','Sueldos','Negociaciones','Liquidación final','Academia','Planificación Horaria']},
+  analyst:    {label:'Analista RRHH',    badge:'ba', tabs:['Inicio','Dashboard','Nómina','Sectores','Antigüedad','Ausentismo','Licencias','Academia','Planificación Horaria']},
+  supervisor: {label:'Jefe / Supervisor', badge:'bs', tabs:['Inicio','Nómina','Ausentismo','Licencias','Academia','Planificación Horaria']},
+  director:   {label:'Dirección',         badge:'bd', tabs:['Inicio','Ejecutivo','Composición','Ausentismo','Sueldos','Nómina','Negociaciones','Academia','Planificación Horaria']},
+  admin:      {label:'Administrador',     badge:'bd', tabs:['Inicio','Dashboard','Nómina','Sectores','Antigüedad','Ejecutivo','Composición','Ausentismo','Licencias','Sueldos','Negociaciones','Liquidación final','Academia','Planificación Horaria']},
 };
 
 // Íconos de línea (se ven iguales en cualquier dispositivo)
 const _svg = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
 const TAB_ICONS = {
-  'Dashboard': _svg('<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/>'),
+  'Inicio': _svg('<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/>'),
+  'Dashboard': _svg('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'),
   'Ejecutivo': _svg('<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>'),
   'Nómina': _svg('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.8c1.6.8 2.6 2.5 3 5.2"/>'),
   'Sectores': _svg('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'),
@@ -578,7 +579,7 @@ const TAB_ICONS = {
 const TAB_ICON_DEF = _svg('<path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4"/>');
 // Grupos del menú (el orden de los grupos es el del menú)
 const TAB_GROUPS = [
-  { nombre: null,          tabs: ['Dashboard','Ejecutivo'] },
+  { nombre: null,          tabs: ['Inicio','Dashboard','Ejecutivo'] },
   { nombre: 'Personal',    icono: TAB_ICONS['Nómina'],         tabs: ['Nómina','Sectores','Antigüedad','Composición','Mi Equipo'] },
   { nombre: 'Asistencia',  icono: TAB_ICONS['Ausentismo'],     tabs: ['Ausentismo','Licencias','Novedades'] },
   { nombre: 'Costos',      icono: TAB_ICONS['Sueldos'],        tabs: ['Sueldos'] },
@@ -602,7 +603,7 @@ function buildApp(){
     if(EXTERNAL_TABS[t]){
       return `<a class="sb-tab" href="${EXTERNAL_TABS[t]}" target="_blank" rel="noopener">${icono}${t} ↗</a>`;
     }
-    return `<button class="sb-tab ${principal?'sb-main':''} ${t===r.tabs[0]?'active':''}" onclick="switchTab(this,'${t}')">${icono}${t}</button>`;
+    return `<button class="sb-tab ${t==='Inicio'?'sb-main':''} ${t===r.tabs[0]?'active':''}" onclick="switchTab(this,'${t}')">${icono}${t}</button>`;
   };
   const enGrupo = new Set();
   let html = '';
@@ -690,6 +691,7 @@ function renderTab(tab){
   const el=document.getElementById('content');
   el.innerHTML='';
   const map={
+    'Inicio':(el)=>inicioTab(el),
     'Dashboard':(el)=>analystDash(el),
     'Nómina':(el)=>nominaTab(el),
     'Sectores':(el)=>sectoresTab(el),
@@ -3193,6 +3195,187 @@ function negFiltrar(){
   if(sector) document.getElementById('neg-sector').value = sector;
   if(sede) document.getElementById('neg-sede').value = sede;
   if(motivo) document.getElementById('neg-motivo').value = motivo;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INICIO · "Para hoy" (alertas que cambian costos o requieren decisión)
+// ═══════════════════════════════════════════════════════════════
+let inicioSel = null;
+let inicioDatos = null;
+let inicioVarCache = null;
+
+function irATab(nombre){
+  const btn = [...document.querySelectorAll('.sb-tab')].find(b => b.textContent.trim() === nombre);
+  if(btn) btn.click();
+}
+
+function inicioFmtF(f){ return String(f.getUTCDate()).padStart(2,'0') + '/' + String(f.getUTCMonth()+1).padStart(2,'0') + '/' + f.getUTCFullYear(); }
+
+function inicioCalcular(varData, topes){
+  const hoyL = new Date();
+  const hoy = new Date(Date.UTC(hoyL.getFullYear(), hoyL.getMonth(), hoyL.getDate()));
+  const en30 = new Date(hoy.getTime() + 30*86400000);
+  const emps = filterBySucursal(getActiveEmployees());
+  const porLegajo = {};
+  emps.forEach(e => porLegajo[String(e['Legajo']).trim()] = e);
+  const dias = (a, b) => Math.round((b - a) / 86400000);
+
+  // Período de prueba (6 meses)
+  const enPrueba = [], pruebaVence = [];
+  // Hitos de antigüedad (5, 10 y 20 años)
+  const hitos = [];
+  let sumaAnt = 0, nAnt = 0;
+  emps.forEach(e => {
+    const ing = LIQ.parseFecha(e['Fecha Ingreso']);
+    if(!ing) return;
+    const fin = new Date(Date.UTC(ing.getUTCFullYear(), ing.getUTCMonth()+6, ing.getUTCDate()));
+    if(fin > hoy){ enPrueba.push(e); if(fin <= en30) pruebaVence.push({ e, fecha: fin, faltan: dias(hoy, fin) }); }
+    const ant = LIQ.antiguedad(ing, hoy); sumaAnt += ant.anios + ant.meses/12; nAnt++;
+    const prox = ant.anios + 1;
+    const aniv = new Date(Date.UTC(ing.getUTCFullYear()+prox, ing.getUTCMonth(), ing.getUTCDate()));
+    if([5,10,20].includes(prox) && aniv > hoy && aniv <= en30){
+      const que = prox === 5 ? 'pasa a 2 meses de preaviso y 21 días de vacaciones' : prox === 10 ? 'pasa a 28 días de vacaciones' : 'pasa a 35 días de vacaciones';
+      hitos.push({ e, fecha: aniv, anios: prox, que, faltan: dias(hoy, aniv) });
+    }
+  });
+  pruebaVence.sort((a,b) => a.fecha - b.fecha);
+  hitos.sort((a,b) => a.fecha - b.fecha);
+
+  // Variables habituales (solo administrador)
+  let habituales = [], porVolverse = [];
+  if(varData && varData.items){
+    varData.items.forEach(v => {
+      const e = porLegajo[String(v.legajo).trim()];
+      if(!e) return;                 // fuera del filtro de sede o dado de baja
+      (v.estado === 'habitual' ? habituales : porVolverse).push({ e, ...v });
+    });
+    const orden = (a,b) => b.promedio - a.promedio;
+    habituales.sort(orden); porVolverse.sort(orden);
+  }
+
+  // Topes desactualizados (solo administrador)
+  const topesViejos = [];
+  if(topes){
+    const ult = {};
+    topes.forEach(t => {
+      const conv = String(t['Convenio']||'').trim(); const d = LIQ.parseFecha(t['Vigencia desde']); const m = LIQ.numero(t['Tope']);
+      if(!conv || !d || !m) return;
+      if(!ult[conv] || d > ult[conv].d) ult[conv] = { conv, d, m };
+    });
+    Object.values(ult).forEach(t => {
+      const meses = (hoy.getUTCFullYear()-t.d.getUTCFullYear())*12 + hoy.getUTCMonth()-t.d.getUTCMonth();
+      if(meses > 3) topesViejos.push({ ...t, meses });
+    });
+  }
+  const personasHab = new Set(habituales.map(h => h.legajo)).size;
+  const personasPorV = new Set(porVolverse.map(h => h.legajo)).size;
+  return { emps, enPrueba, pruebaVence, hitos, habituales, porVolverse, personasHab, personasPorV, topesViejos,
+           antProm: nAnt ? sumaAnt/nAnt : 0, meses: varData ? varData.meses : [] };
+}
+
+async function inicioTab(el){
+  const nombre = ((currentUser && (currentUser.nombreReal || currentUser.nombre)) || '').split(/[\s,]+/).filter(Boolean);
+  const pila = nombre.length > 1 && /,/.test(currentUser.nombreReal||'') ? nombre[nombre.length-1] : (nombre[0] || '');
+  const h = new Date().getHours();
+  const saludo = h < 13 ? 'Buen día' : h < 20 ? 'Buenas tardes' : 'Buenas noches';
+  const fecha = new Date().toLocaleDateString('es-AR', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  el.innerHTML = `<div class="sec active" id="inicio-sec">
+    <div class="sh"><div><p>${escHtml(fecha.charAt(0).toUpperCase() + fecha.slice(1))}</p><h2>${saludo}${pila ? ', ' + escHtml(pila.charAt(0).toUpperCase()+pila.slice(1).toLowerCase()) : ''}</h2></div>
+    <div class="sinput" style="display:none"></div></div>
+    <div id="inicio-body"><div style="display:flex;align-items:center;gap:14px;padding:30px"><div class="spinner"></div><span style="color:var(--mid)">Revisando las alertas del día…</span></div></div>
+  </div>`;
+  let varData = null, topes = null, aviso = '';
+  if(role === 'admin'){
+    try {
+      const [v, cfg] = await Promise.all([
+        inicioVarCache ? Promise.resolve(inicioVarCache) : api({ action: 'alertasVariables' }),
+        liqCargarConfig(),
+      ]);
+      varData = v; inicioVarCache = v; topes = cfg.topes;
+    } catch(e){ aviso = 'No se pudieron revisar sueldos y topes: ' + e.message; }
+  }
+  inicioDatos = inicioCalcular(varData, topes);
+  inicioRender(aviso);
+}
+
+function inicioRender(aviso){
+  const D = inicioDatos; if(!D) return;
+  const body = document.getElementById('inicio-body'); if(!body) return;
+  const esAdmin = role === 'admin';
+  const card = (id, nivel, cant, texto, accion) => {
+    const col = { urgente: 'var(--rojo)', atencion: 'var(--w)', dato: 'var(--a)', ok: 'var(--c)' }[nivel];
+    const etq = { urgente: 'Urgente', atencion: 'Atención', dato: 'Dato a actualizar', ok: 'Al día' }[nivel];
+    const sel = inicioSel === id;
+    return `<div class="kcard" style="border-top:4px solid ${col};display:flex;flex-direction:column;gap:6px;${sel?'box-shadow:0 0 0 2px var(--a);':''}">
+      <span style="font-size:11px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:${col}">${cant ? etq : 'Al día'}</span>
+      <span style="font-size:30px;font-weight:700;line-height:1.1">${cant}</span>
+      <span style="font-size:13px;color:var(--text);line-height:1.4;flex:1">${texto}</span>
+      ${cant ? `<button class="btn bts" style="align-self:flex-start;margin-top:6px" onclick="inicioVer('${id}')">${sel ? 'Ocultar' : accion} </button>` : ''}
+    </div>`;
+  };
+  const cards = [
+    card('prueba', D.pruebaVence.length ? 'urgente' : 'ok', D.pruebaVence.length, 'períodos de prueba vencen en los próximos 30 días', 'Ver quiénes'),
+    card('hitos', D.hitos.length ? 'atencion' : 'ok', D.hitos.length, 'personas cumplen 5, 10 o 20 años en los próximos 30 días (cambian preaviso o vacaciones)', 'Ver quiénes'),
+  ];
+  if(esAdmin){
+    cards.push(card('porvolverse', D.personasPorV ? 'atencion' : 'ok', D.personasPorV, 'personas por volver habitual un variable el mes que viene (horas extra, plus, comisiones)', 'Ver quiénes'));
+    cards.push(card('topes', D.topesViejos.length ? 'dato' : 'ok', D.topesViejos.length, 'topes de convenio con más de 3 meses', 'Ver cuáles'));
+  }
+
+  const kpi = (lbl, val, sub) => `<div class="kcard"><div class="klbl">${lbl}</div><div class="kval" style="color:var(--a)">${val}</div><div style="font-size:12px;color:var(--dim)">${sub||''}</div></div>`;
+  const porSede = {}; D.emps.forEach(e => { const s = String(e['Ubicación']||'Sin sede').trim(); porSede[s] = (porSede[s]||0) + 1; });
+  const sedes = Object.entries(porSede).sort((a,b)=>b[1]-a[1]).map(([s,n]) => `${escHtml(s.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase()))} ${n.toLocaleString('es-AR')}`).join(' · ');
+  const kpis = [
+    kpi('Dotación activa', D.emps.length.toLocaleString('es-AR'), sedes),
+    kpi('En período de prueba', D.enPrueba.length.toLocaleString('es-AR'), 'ingresaron hace menos de 6 meses'),
+    kpi('Antigüedad promedio', D.antProm.toLocaleString('es-AR',{maximumFractionDigits:1}) + ' años', ''),
+  ];
+  if(esAdmin) kpis.push(kpi('Con variables habituales', D.personasHab.toLocaleString('es-AR'), 'ya suman en la base de la indemnización'));
+
+  const accesos = [
+    ['Liquidación final','Calcular una liquidación final'],
+    ['Nómina','Buscar en la nómina'],
+    ['Ausentismo','Ver el ausentismo'],
+    ['Planificación Horaria','Planificación horaria'],
+  ].filter(([t]) => ROLES[role].tabs.includes(t));
+
+  body.innerHTML = `
+    ${aviso ? `<div class="alert aw">${escHtml(aviso)}</div>` : ''}
+    <h3 style="font-size:16px;font-weight:600;margin:4px 0 12px">Para hoy</h3>
+    <div class="kgrid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">${cards.join('')}</div>
+    <div id="inicio-det">${inicioDetalle()}</div>
+    <h3 style="font-size:16px;font-weight:600;margin:8px 0 12px">Indicadores</h3>
+    <div class="kgrid">${kpis.join('')}</div>
+    ${accesos.length ? `<div class="fcard" style="background:var(--a);border-color:var(--a)">
+      <h3 style="color:#fff;margin-bottom:12px">Accesos rápidos</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px">
+        ${accesos.map(([t,l]) => EXTERNAL_TABS[t]
+          ? `<a href="${EXTERNAL_TABS[t]}" target="_blank" rel="noopener" style="display:flex;justify-content:space-between;align-items:center;padding:14px;border-radius:10px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);color:#fff;text-decoration:none;font-size:14px;font-weight:500">${l}<span aria-hidden="true">↗</span></a>`
+          : `<button onclick="irATab('${t}')" style="display:flex;justify-content:space-between;align-items:center;padding:14px;border-radius:10px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);color:#fff;font:500 14px Poppins,sans-serif;cursor:pointer;text-align:left">${l}<span aria-hidden="true">→</span></button>`).join('')}
+      </div></div>` : ''}`;
+}
+
+function inicioVer(id){ inicioSel = inicioSel === id ? null : id; inicioRender(); if(inicioSel){ const d=document.getElementById('inicio-det'); d && d.scrollIntoView({behavior:'smooth', block:'start'}); } }
+
+function inicioDetalle(){
+  const D = inicioDatos; if(!D || !inicioSel) return '';
+  const fila = (cols) => `<tr>${cols.map((c,i)=>`<td style="${i>=cols.length-1?'':''}">${c}</td>`).join('')}</tr>`;
+  const persona = (e) => `<strong>${escHtml(e['Nombre']||'')}</strong><div style="font-size:11px;color:var(--dim)">Legajo ${escHtml(String(e['Legajo']))} · ${escHtml(e['Sector']||'')} · ${escHtml(e['Ubicación']||'')}</div>`;
+  const tabla = (titulo, nota, cab, filas) => `<div class="tcard"><div class="thead"><div><h3>${titulo}</h3><div style="font-size:12px;color:var(--dim);margin-top:2px">${nota}</div></div></div>
+    <div style="overflow-x:auto"><table><thead><tr>${cab.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>${filas.join('') || `<tr><td colspan="${cab.length}" style="color:var(--dim)">Nada pendiente.</td></tr>`}</tbody></table></div></div>`;
+  const plural = (n, s, p) => n === 1 ? s : p;
+  if(inicioSel === 'prueba') return tabla('Períodos de prueba que vencen', 'Después de esa fecha, una desvinculación ya paga indemnización y preaviso.',
+    ['Persona','Ingreso','Vence','Faltan'], D.pruebaVence.map(x => fila([persona(x.e), escHtml(x.e['Fecha Ingreso']||''), inicioFmtF(x.fecha), `${x.faltan} ${plural(x.faltan,'día','días')}`])));
+  if(inicioSel === 'hitos') return tabla('Hitos de antigüedad', 'Al cumplir 5 años el preaviso pasa a 2 meses; las vacaciones suben a 21, 28 o 35 días.',
+    ['Persona','Cumple','Fecha','Qué cambia'], D.hitos.map(x => fila([persona(x.e), `${x.anios} años`, inicioFmtF(x.fecha), x.que])));
+  if(inicioSel === 'porvolverse'){
+    const per = (D.meses||[]).length;
+    return tabla('Variables por volverse habituales', `Los cobró en 5 de los últimos ${per} meses, incluido el último. Si se cobran un mes más, pasan a sumar en la base de la indemnización.`,
+      ['Persona','Concepto','Meses cobrado','Promedio mensual'], D.porVolverse.map(x => fila([persona(x.e), escHtml(x.concepto), `${x.meses} de ${x.total}`, (x.promedio||0).toLocaleString('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0})])));
+  }
+  if(inicioSel === 'topes') return tabla('Topes de convenio para actualizar', 'Se cargan en la hoja Topes de Base Nini. Un tope viejo puede dar una indemnización menor que la real.',
+    ['Convenio','Vigente desde','Tope cargado','Antigüedad del dato'], D.topesViejos.map(t => fila([escHtml(t.conv), inicioFmtF(t.d), t.m.toLocaleString('es-AR',{style:'currency',currency:'ARS'}), `${t.meses} meses`])));
+  return '';
 }
 
 // ═══════════════════════════════════════════════════════════════

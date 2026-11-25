@@ -70,6 +70,10 @@ function doPost(e) {
 
     if (accion === 'datos') return seg_json_(seg_datos_(usuario, body.hoja));
     if (accion === 'yo')    return seg_json_({ ok: true, usuario: usuario });
+    if (accion === 'alertasVariables') {
+      if (usuario.rol !== 'admin') return seg_json_({ error: 'Solo el administrador', code: 'PERM' });
+      return seg_json_(seg_alertasVariables_());
+    }
     if (accion === 'sueldosLegajo') {
       if (usuario.rol !== 'admin') return seg_json_({ error: 'Solo el administrador puede ver la liquidación final', code: 'PERM' });
       return seg_json_(seg_sueldosLegajo_(body.legajo));
@@ -113,6 +117,56 @@ function seg_sueldosLegajo_(legajo) {
     if (typeof monto !== 'number') monto = Number(String(txt[i][iM]).replace(/\./g, '').replace(',', '.')) || 0;
     out.push({ Novedad: String(txt[i][iN]), Monto: monto, Mes: String(txt[i][iMes]).trim() });
   }
+  return out;
+}
+
+
+// ─── Inicio: variables que son o están por volverse habituales ─────
+// Recorre la hoja Sueldos y, por persona y concepto variable (según la
+// hoja ConceptosLiquidacion), cuenta en cuántos meses se cobró.
+//  - habitual: 6 meses o más (entra en la base de la indemnización)
+//  - por volverse habitual: 5 meses y lo cobró el último mes
+function seg_alertasVariables_() {
+  var cache = CacheService.getScriptCache();
+  var guardado = cache.get('alertasVariables');
+  if (guardado) return JSON.parse(guardado);
+
+  var tipos = {};
+  seg_leerHoja_('ConceptosLiquidacion', 'texto').forEach(function (f) {
+    tipos[String(f['Concepto']).toUpperCase().replace(/\s+/g, ' ').trim()] = String(f['Tipo']).toUpperCase().trim();
+  });
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Sueldos');
+  var txt = sheet.getDataRange().getDisplayValues();
+  var enc = txt[0].map(function (h) { return String(h).trim(); });
+  var iL = enc.indexOf('Legajo'), iN = enc.indexOf('Novedad'), iM = enc.indexOf('Monto'), iMes = enc.indexOf('Mes');
+  var meses = {}, cobros = {};      // cobros[legajo|concepto] = {mes: monto}
+  for (var i = 1; i < txt.length; i++) {
+    var mes = String(txt[i][iMes]).trim().slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(mes)) continue;
+    meses[mes] = true;
+    var con = String(txt[i][iN]).toUpperCase().replace(/\s+/g, ' ').trim();
+    if (tipos[con] !== 'VARIABLE') continue;
+    var monto = Number(String(txt[i][iM]).replace(/\./g, '').replace(',', '.')) || 0;
+    if (monto <= 0) continue;
+    var k = String(txt[i][iL]).trim().replace(/\.0+$/, '') + '|' + con;
+    if (!cobros[k]) cobros[k] = {};
+    cobros[k][mes] = (cobros[k][mes] || 0) + monto;
+  }
+  var lista = Object.keys(meses).sort().slice(-12);
+  var ultimo = lista[lista.length - 1];
+  var out = { meses: lista, items: [] };
+  Object.keys(cobros).forEach(function (k) {
+    var c = cobros[k];
+    var enVentana = lista.filter(function (m) { return c[m] > 0; });
+    var n = enVentana.length;
+    var estado = n >= 6 ? 'habitual' : (n === 5 && c[ultimo] > 0 ? 'por volverse habitual' : '');
+    if (!estado) return;
+    var suma = enVentana.reduce(function (s, m) { return s + c[m]; }, 0);
+    var partes = k.split('|');
+    out.items.push({ legajo: partes[0], concepto: partes[1], meses: n, total: lista.length, promedio: Math.round(suma / lista.length), estado: estado });
+  });
+  var json = JSON.stringify(out);
+  if (json.length < 90000) cache.put('alertasVariables', json, 3600);   // 1 hora
   return out;
 }
 
