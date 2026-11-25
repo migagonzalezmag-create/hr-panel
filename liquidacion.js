@@ -93,10 +93,10 @@ const LIQ = (() => {
       .map(t => ({ conv: norm(t['Convenio']), desde: parseFecha(t['Vigencia desde']), tope: numero(t['Tope']), fuente: t['Fuente'] || '' }))
       .filter(t => t.conv === conv && t.tope > 0 && t.desde)
       .sort((a, b) => a.desde - b.desde);
-    if (!filas.length) return { tope: 0, desde: null, fuente: '', nota: nota || 'No hay tope cargado para ' + convenio + ' en la hoja Topes.' };
+    if (!filas.length) return { tope: 0, desde: null, fuente: '', conv: convenio, nota: (nota ? nota + ' ' : '') + 'No hay tope cargado para ' + (conv === 'COMERCIO' ? 'Comercio' : convenio) + ' en la hoja Topes.' };
     let elegido = filas[0];
     filas.forEach(f => { if (f.desde <= egreso) elegido = f; });
-    return { tope: elegido.tope, desde: elegido.desde, fuente: elegido.fuente, nota };
+    return { tope: elegido.tope, desde: elegido.desde, fuente: elegido.fuente, conv: conv === 'COMERCIO' ? 'Comercio' : convenio, nota };
   }
 
   // ── Cálculo principal ──────────────────────────────────────────
@@ -173,7 +173,7 @@ const LIQ = (() => {
     if (p.topeManual > 0) notas.push('Se usó un tope cargado a mano: $' + tope.toLocaleString('es-AR') + '.');
     else if (tv.desde) {
       const mesesTope = (egreso.getUTCFullYear() - tv.desde.getUTCFullYear()) * 12 + egreso.getUTCMonth() - tv.desde.getUTCMonth();
-      if (mesesTope > 3) notas.push('El tope de ' + p.convenio + ' cargado es de ' + fmtF(tv.desde) + ' (hace ' + mesesTope + ' meses). Puede estar desactualizado: verificalo antes de negociar.');
+      if (mesesTope > 3) notas.push('El tope de ' + tv.conv + ' cargado es de ' + fmtF(tv.desde) + ' (hace ' + mesesTope + ' meses). Puede estar desactualizado: verificalo antes de negociar.');
     }
     let baseTopeada = base, topeAplicado = false, pisoAplicado = false;
     if (tope > 0 && base > tope) {
