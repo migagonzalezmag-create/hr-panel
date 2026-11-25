@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════════
 // HR NINI · SEGURIDAD (login en el servidor + datos según el rol)
-// Última actualización: 25/11/2026
+// Última actualización: 25/11/2026 (agrega liquidación final)
 //
 // Qué hace:
 //  - El usuario y la contraseña se validan acá, en el servidor. El panel
@@ -40,7 +40,10 @@ var SEG = {
     'Turnos':        { roles: ['admin', 'director', 'analyst', 'supervisor'], modo: 'valores', filtro: null },
     'Planificacion': { roles: ['admin', 'director', 'analyst', 'supervisor'], modo: 'valores', filtro: null },
     'Sueldos':       { roles: ['admin', 'director'],                          modo: 'texto',   filtro: null },
-    'Negociaciones': { roles: ['admin', 'director'],                          modo: 'valores', filtro: null }
+    'Negociaciones': { roles: ['admin', 'director'],                          modo: 'valores', filtro: null },
+    // Liquidación final (solo administrador)
+    'Topes':                { roles: ['admin'], modo: 'valores', filtro: null },
+    'ConceptosLiquidacion': { roles: ['admin'], modo: 'texto', filtro: null }
     // La hoja Usuarios no figura acá a propósito: no se entrega nunca.
   }
 };
@@ -67,6 +70,10 @@ function doPost(e) {
 
     if (accion === 'datos') return seg_json_(seg_datos_(usuario, body.hoja));
     if (accion === 'yo')    return seg_json_({ ok: true, usuario: usuario });
+    if (accion === 'sueldosLegajo') {
+      if (usuario.rol !== 'admin') return seg_json_({ error: 'Solo el administrador puede ver la liquidación final', code: 'PERM' });
+      return seg_json_(seg_sueldosLegajo_(body.legajo));
+    }
 
     // Acciones de Planificación Horaria (funciones de Código.gs)
     if (accion === 'guardarPlanificacion') {
@@ -83,6 +90,30 @@ function doPost(e) {
   } catch (err) {
     return seg_json_({ error: err.message });
   }
+}
+
+
+// ─── Liquidación final: sueldos de UNA persona ─────────────────────
+// Devuelve solo las filas de la hoja Sueldos de ese legajo (no toda la hoja).
+function seg_sueldosLegajo_(legajo) {
+  var leg = String(legajo || '').trim().replace(/\.0+$/, '');
+  if (!leg) return { error: 'Falta el legajo' };
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Sueldos');
+  if (!sheet) return { error: 'No existe la hoja Sueldos' };
+  var rango = sheet.getDataRange();
+  var val = rango.getValues();
+  var txt = rango.getDisplayValues();
+  var enc = txt[0].map(function (h) { return String(h).trim(); });
+  var iL = enc.indexOf('Legajo'), iN = enc.indexOf('Novedad'), iM = enc.indexOf('Monto'), iMes = enc.indexOf('Mes');
+  if (iL < 0 || iN < 0 || iM < 0 || iMes < 0) return { error: 'La hoja Sueldos no tiene las columnas Legajo, Novedad, Monto y Mes' };
+  var out = [];
+  for (var i = 1; i < val.length; i++) {
+    if (String(txt[i][iL]).trim().replace(/\.0+$/, '') !== leg) continue;
+    var monto = val[i][iM];
+    if (typeof monto !== 'number') monto = Number(String(txt[i][iM]).replace(/\./g, '').replace(',', '.')) || 0;
+    out.push({ Novedad: String(txt[i][iN]), Monto: monto, Mes: String(txt[i][iMes]).trim() });
+  }
+  return out;
 }
 
 

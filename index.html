@@ -17,6 +17,7 @@
 <meta name="apple-mobile-web-app-title" content="HRnini">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="liquidacion.js"></script>
 <style>
 :root {
   --bg:#0a0d14; --surface:#111520; --surface2:#161c2d; --border:#1e2640;
@@ -24,6 +25,7 @@
   --text:#e8eaf2; --dim:#6b738f; --mid:#9ba3bb;
 }
 *{margin:0;padding:0;box-sizing:border-box}
+@media print{.sidebar,.topbar,.sb-overlay,.liq-noprint,.toast{display:none!important}.content{margin:0!important;padding:0!important;max-width:none!important}body{background:#fff!important;color:#000!important}.kcard,.cc,.tcard,.fcard{background:#fff!important;border-color:#bbb!important;break-inside:avoid}td,th,.klbl,.cs{color:#000!important}}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
 
 /* LOGIN */
@@ -426,6 +428,7 @@ function doLogout(){
   if(authToken){ api({ action: 'logout' }).catch(()=>{}); }
   authToken=null; borrarSesion();
   employees=[]; fotosMap={}; licencias=[]; licenciasLoaded=false; licenciasRaw=null; ausenciasRaw=[]; ausenciasLoaded=false; sueldos=[]; sueldosLoaded=false;
+  liqCfg=null; liqUltimo=null;
   role=null; currentUser=null; novedades=[];
   destroyCharts();
   document.getElementById('app').style.display='none';
@@ -544,14 +547,14 @@ const ROLES = {
   analyst:    {label:'Analista RRHH',    badge:'ba', tabs:['Dashboard','Nómina','Sectores','Antigüedad','Ausentismo','Licencias','Academia','Planificación Horaria']},
   supervisor: {label:'Jefe / Supervisor', badge:'bs', tabs:['Nómina','Ausentismo','Licencias','Academia','Planificación Horaria']},
   director:   {label:'Dirección',         badge:'bd', tabs:['Ejecutivo','Composición','Ausentismo','Sueldos','Nómina','Negociaciones','Academia','Planificación Horaria']},
-  admin:      {label:'Administrador',     badge:'bd', tabs:['Dashboard','Nómina','Sectores','Antigüedad','Ejecutivo','Composición','Ausentismo','Licencias','Sueldos','Negociaciones','Academia','Planificación Horaria']},
+  admin:      {label:'Administrador',     badge:'bd', tabs:['Dashboard','Nómina','Sectores','Antigüedad','Ejecutivo','Composición','Ausentismo','Licencias','Sueldos','Negociaciones','Liquidación final','Academia','Planificación Horaria']},
 };
 
 const TAB_ICONS = {
   'Dashboard':'📊','Nómina':'👥','Sectores':'🏢','Antigüedad':'📅',
   'Mi Equipo':'👤','Novedades':'📝','Ejecutivo':'📈','Composición':'🧩',
   'Ausentismo':'🚫','Licencias':'📋','Sueldos':'💰','Academia':'🎓',
-  'Negociaciones':'🤝','Planificación Horaria':'🕐'
+  'Negociaciones':'🤝','Liquidación final':'🧮','Planificación Horaria':'🕐'
 };
 
 // Tabs que en realidad son links externos (no renderizan contenido interno)
@@ -657,6 +660,7 @@ function renderTab(tab){
     'Licencias':(el)=>licenciasTab(el),
     'Sueldos':(el)=>sueldosTab(el),
     'Negociaciones':(el)=>negociacionesTab(el),
+    'Liquidación final':(el)=>liquidacionTab(el),
     'Academia':(el)=>academiaTab(el),
   };
   if(map[tab]) map[tab](el);
@@ -3147,6 +3151,218 @@ function negFiltrar(){
   if(sector) document.getElementById('neg-sector').value = sector;
   if(sede) document.getElementById('neg-sede').value = sede;
   if(motivo) document.getElementById('neg-motivo').value = motivo;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LIQUIDACIÓN FINAL (solo administrador) — cálculo en liquidacion.js
+// ═══════════════════════════════════════════════════════════════
+let liqCfg = null;          // {topes, mapa, neg}
+let liqUltimo = null;       // último resultado
+const liqMoney = (v) => (Number(v)||0).toLocaleString('es-AR',{style:'currency',currency:'ARS',minimumFractionDigits:2,maximumFractionDigits:2});
+const liqPct = (v) => (Number(v)||0).toLocaleString('es-AR',{maximumFractionDigits:1}) + ' %';
+
+async function liqCargarConfig(){
+  if(liqCfg) return liqCfg;
+  const [topes, conceptos] = await Promise.all([
+    api({ action:'datos', hoja:'Topes' }),
+    api({ action:'datos', hoja:'ConceptosLiquidacion' }),
+  ]);
+  let neg = [];
+  try { neg = await api({ action:'datos', hoja:'Negociaciones' }); } catch(e){ console.warn('Negociaciones no disponible', e.message); }
+  liqCfg = { topes, mapa: LIQ.mapaDesdeHoja(conceptos), neg: Array.isArray(neg) ? neg : [] };
+  return liqCfg;
+}
+
+async function liquidacionTab(el){
+  if(role !== 'admin'){ el.innerHTML = '<div class="sec active"><div class="empty">Solo el rol administrador puede usar la liquidación final.</div></div>'; return; }
+  el.innerHTML = `<div class="sec active"><div class="sh"><div><h2>Liquidación final</h2><p>Cargando configuración...</p></div></div>
+    <div style="display:flex;align-items:center;justify-content:center;padding:60px;gap:16px"><div class="spinner"></div></div></div>`;
+  try { await liqCargarConfig(); }
+  catch(e){ el.innerHTML = `<div class="sec active"><div class="alert" style="background:rgba(247,95,95,.1);color:var(--d)">❌ No se pudo cargar la configuración: ${escHtml(e.message)}</div></div>`; return; }
+
+  const hoy = new Date(); const hoyISO = new Date(hoy.getTime() - hoy.getTimezoneOffset()*60000).toISOString().slice(0,10);
+  const opciones = (employees||[]).map(e => `<option value="${escHtml(String(e['Legajo']).trim())} — ${escHtml(e['Nombre']||'')}"></option>`).join('');
+
+  el.innerHTML = `<div class="sec active" id="liq-sec">
+    <div class="sh"><div><h2>Liquidación final</h2><p>Estimación para negociar · despido sin causa, falta de trabajo, con causa y arreglos</p></div>
+      <button class="btn bts liq-noprint" onclick="window.print()">🖨️ Imprimir</button></div>
+
+    <div class="fcard liq-noprint">
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;align-items:end">
+        <div><div class="klbl">Legajo o nombre</div>
+          <input class="sinput" id="liq-emp" list="liq-emps" placeholder="Escribí el legajo o el apellido" style="width:100%" autocomplete="off">
+          <datalist id="liq-emps">${opciones}</datalist></div>
+        <div><div class="klbl">Fecha de egreso</div><input class="sinput" type="date" id="liq-egreso" value="${hoyISO}" style="width:100%"></div>
+        <div><div class="klbl">¿Se otorgó preaviso?</div>
+          <select class="sinput" id="liq-preaviso" style="width:100%"><option value="no">No (se paga)</option><option value="si">Sí (ya preavisado)</option></select></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:12px;align-items:end;margin-top:12px">
+        <div><div class="klbl">Vacaciones pendientes de años anteriores (días)</div><input class="sinput" type="number" min="0" step="1" id="liq-vacpend" value="0" style="width:100%"></div>
+        <div><div class="klbl">Vacaciones de este año ya gozadas (días)</div><input class="sinput" type="number" min="0" step="1" id="liq-vacgoz" value="0" style="width:100%"></div>
+        <div><div class="klbl">Tope del convenio (opcional, pisa la hoja Topes)</div><input class="sinput" type="number" min="0" step="0.01" id="liq-tope" placeholder="Usar hoja Topes" style="width:100%"></div>
+        <button class="btn btp" onclick="liqCalcular()">Calcular</button>
+      </div>
+    </div>
+    <div id="liq-out"></div>
+  </div>`;
+  document.getElementById('liq-emp').addEventListener('keydown', ev => { if(ev.key==='Enter') liqCalcular(); });
+}
+
+function liqBuscarEmpleado(txt){
+  const t = String(txt||'').trim();
+  if(!t) return null;
+  const leg = t.split('—')[0].trim();
+  let e = (employees||[]).find(x => String(x['Legajo']).trim() === leg);
+  if(e) return e;
+  const q = t.toLowerCase();
+  const matches = (employees||[]).filter(x => String(x['Nombre']||'').toLowerCase().includes(q));
+  return matches.length === 1 ? matches[0] : (matches.length ? { _varios: matches } : null);
+}
+
+async function liqCalcular(){
+  const out = document.getElementById('liq-out');
+  const emp = liqBuscarEmpleado(document.getElementById('liq-emp').value);
+  if(!emp){ out.innerHTML = '<div class="alert" style="background:rgba(247,163,79,.1);color:var(--w)">⚠️ No encontré a esa persona en la nómina.</div>'; return; }
+  if(emp._varios){ out.innerHTML = `<div class="alert" style="background:rgba(247,163,79,.1);color:var(--w)">⚠️ Hay ${emp._varios.length} personas que coinciden. Elegí una de la lista o escribí el legajo.</div>`; return; }
+  const legajo = String(emp['Legajo']).trim();
+  out.innerHTML = '<div style="display:flex;align-items:center;gap:14px;padding:30px"><div class="spinner"></div><span style="color:var(--mid)">Buscando los sueldos de ' + escHtml(emp['Nombre']) + '...</span></div>';
+  let filas;
+  try { filas = await api({ action:'sueldosLegajo', legajo }); }
+  catch(e){ out.innerHTML = `<div class="alert" style="background:rgba(247,95,95,.1);color:var(--d)">❌ ${escHtml(e.message)}</div>`; return; }
+
+  let r;
+  try {
+    r = LIQ.calcular({
+      fechaIngreso: emp['Fecha Ingreso'],
+      fechaEgreso: document.getElementById('liq-egreso').value,
+      convenio: emp['Convenio'] || '',
+      filasSueldo: filas,
+      mapaConceptos: liqCfg.mapa,
+      topes: liqCfg.topes,
+      topeManual: Number(document.getElementById('liq-tope').value) || 0,
+      preavisoOtorgado: document.getElementById('liq-preaviso').value === 'si',
+      vacPendientes: document.getElementById('liq-vacpend').value,
+      vacGozadasAnio: document.getElementById('liq-vacgoz').value,
+    });
+  } catch(e){ out.innerHTML = `<div class="alert" style="background:rgba(247,95,95,.1);color:var(--d)">❌ ${escHtml(e.message)}</div>`; return; }
+  liqUltimo = { r, emp };
+  liqRender();
+}
+
+function liqHistorico(emp){
+  const anioAct = new Date().getFullYear();
+  const filas = (liqCfg.neg||[]).map(n => ({
+    anio: parseInt(n['Año'])||0, sector: String(n['Sector']||'').trim().toLowerCase(), sede: String(n['Sede']||'').trim().toLowerCase(),
+    monto: parseFloat(n['Monto Negociado'])||0, indem: parseFloat(n['Indem Ley'])||0,
+  })).filter(n => n.monto > 0 && n.indem > 0 && n.anio >= anioAct - 2);
+  const prom = (arr) => arr.length ? arr.reduce((s,n)=>s + n.monto/n.indem*100, 0) / arr.length : null;
+  const sector = String(emp['Sector']||'').trim().toLowerCase();
+  const sede = String(emp['Ubicación']||'').trim().toLowerCase();
+  const sameSede = filas.filter(n => n.sede && (sede.includes(n.sede) || n.sede.includes(sede)));
+  return [
+    { lbl: 'Todos (' + (anioAct-2) + '-' + anioAct + ')', n: filas.length, p: prom(filas) },
+    { lbl: 'Sector ' + (emp['Sector']||''), n: filas.filter(n=>n.sector===sector).length, p: prom(filas.filter(n=>n.sector===sector)) },
+    { lbl: 'Sede ' + (emp['Ubicación']||''), n: sameSede.length, p: prom(sameSede) },
+  ];
+}
+
+function liqRender(pctLibre){
+  if(!liqUltimo) return;
+  const { r, emp } = liqUltimo;
+  const R = r.rubros, E = r.escenarios;
+  const out = document.getElementById('liq-out');
+  const ant = r.antig;
+  const antTxt = `${ant.anios} años, ${ant.meses} meses y ${ant.dias} días`;
+  const fila = (lbl, a, b, c, nota) => `<tr><td>${lbl}${nota?`<div style="font-size:10px;color:var(--dim)">${nota}</div>`:''}</td>
+    <td style="text-align:right">${a===null?'—':liqMoney(a)}</td><td style="text-align:right">${b===null?'—':liqMoney(b)}</td><td style="text-align:right">${c===null?'—':liqMoney(c)}</td></tr>`;
+
+  const pcts = [50,60,70,80,100];
+  const pLibre = pctLibre != null ? pctLibre : (Number(document.getElementById('liq-pct')?.value) || 65);
+  const filaArr = (p) => {
+    const monto = E.sinCausa * p / 100;
+    const bajo = monto < E.conCausa;
+    return `<tr><td><strong>${p} %</strong></td><td style="text-align:right">${liqMoney(monto)}</td>
+      <td style="text-align:right;color:var(--c)">${liqMoney(E.sinCausa - monto)}</td>
+      <td>${bajo?'<span class="pill" style="background:rgba(247,95,95,.15);color:var(--d)">Menos que la liquidación final</span>':''}</td></tr>`;
+  };
+  const hist = liqHistorico(emp);
+
+  const varRows = r.variables.length ? r.variables.map(v => `<tr><td>${escHtml(v.concepto)}</td><td style="text-align:center">${v.mesesCobrados} de ${r.mesesConDatos.length}</td>
+     <td style="text-align:right">${liqMoney(v.prom6)}</td><td style="text-align:right">${liqMoney(v.prom12)}</td>
+     <td style="text-align:right;${v.habitual?'':'color:var(--dim)'}">${v.habitual?liqMoney(v.usado):'—'}</td><td style="font-size:11px;color:var(--dim)">${v.criterio}</td></tr>`).join('')
+     : '<tr><td colspan="6" style="color:var(--dim)">Sin conceptos variables.</td></tr>';
+  const conceptosMes = r.conceptosMejorMes.map(c => `<tr><td>${escHtml(c[0])}</td><td>${c[2]==='NOREM'?'No remunerativo':'Fijo'}</td><td style="text-align:right">${liqMoney(c[1])}</td></tr>`).filter((x,i)=>r.conceptosMejorMes[i][2]!=='VARIABLE').join('');
+
+  out.innerHTML = `
+    <div class="fcard">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <div><div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800">${escHtml(emp['Nombre'])}</div>
+          <div style="color:var(--mid);font-size:12px;margin-top:4px">Legajo ${escHtml(String(emp['Legajo']))} · ${escHtml(emp['Sector']||'')} · ${escHtml(emp['Ubicación']||'')} · ${escHtml(emp['Convenio']||'')} ${emp['Categoria']?'· '+escHtml(emp['Categoria']):''}</div></div>
+        <div style="text-align:right;font-size:12px;color:var(--mid)">Ingreso ${r.ingreso} · Egreso ${r.egreso}<br>Antigüedad: <strong style="color:var(--text)">${antTxt}</strong> → ${r.antig.aniosIndemn} ${r.antig.aniosIndemn===1?'año':'años'} para indemnizar</div>
+      </div>
+    </div>
+
+    ${r.notas.map(n => `<div class="alert" style="background:rgba(247,163,79,.08);color:var(--w)">⚠️ ${escHtml(n)}</div>`).join('')}
+
+    <div class="kgrid">
+      <div class="kcard"><div class="klbl">Despido sin causa (art. 245)</div><div class="kval" style="font-size:22px">${liqMoney(E.sinCausa)}</div></div>
+      <div class="kcard"><div class="klbl">Falta de trabajo (art. 247)</div><div class="kval" style="font-size:22px">${liqMoney(E.faltaTrabajo)}</div></div>
+      <div class="kcard"><div class="klbl">Con causa / renuncia</div><div class="kval" style="font-size:22px">${liqMoney(E.conCausa)}</div></div>
+      <div class="kcard"><div class="klbl">Base indemnizatoria</div><div class="kval" style="font-size:22px">${liqMoney(r.baseTopeada)}</div>
+        <div style="font-size:11px;color:var(--dim)">${r.topeAplicado?(r.pisoAplicado?'Tope con piso del 67 % (Vizzoti)':'Con tope del convenio'):'Sin tope (la base no supera el tope)'}</div></div>
+    </div>
+
+    <div class="tcard"><div class="thead"><div class="ct">Liquidación por escenario</div></div>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>Rubro</th><th style="text-align:right">Sin causa</th><th style="text-align:right">Falta de trabajo</th><th style="text-align:right">Con causa / renuncia</th></tr></thead>
+        <tbody>
+          ${fila('Indemnización por antigüedad', R.indem245, R.indem247, null, `${liqMoney(r.baseTopeada)} × ${r.antig.aniosIndemn}${R.indem247?' · art. 247: 50 %':''}`)}
+          ${fila('Preaviso', R.preaviso, R.preaviso, null, r.rubros.preaviso? `${r.mesesPreaviso} ${r.mesesPreaviso===1?'mes':'meses'} × ${liqMoney(r.sueldoNormal)}` : 'No corresponde o ya se otorgó')}
+          ${fila('SAC sobre preaviso', R.sacPreaviso, R.sacPreaviso, null)}
+          ${fila('Integración del mes de despido', R.integracion, R.integracion, null)}
+          ${fila('SAC sobre integración', R.sacIntegracion, R.sacIntegracion, null)}
+          ${fila('Días trabajados del mes', R.diasTrab, R.diasTrab, R.diasTrab)}
+          ${fila('SAC proporcional', R.sacProp, R.sacProp, R.sacProp, `${liqMoney(r.mejorSem)} ÷ 2 × ${r.diasSem}/${r.totalSem} días (mejor mes del semestre: ${r.mesMejorSem})`)}
+          ${fila('Vacaciones no gozadas', R.vacaciones, R.vacaciones, R.vacaciones, `${r.vacDias.toLocaleString('es-AR')} días × ${liqMoney(r.valorDiaVac)} (sueldo ÷ 25)`)}
+          ${fila('SAC sobre vacaciones', R.sacVacaciones, R.sacVacaciones, R.sacVacaciones)}
+          <tr style="font-weight:700"><td>Total bruto</td><td style="text-align:right">${liqMoney(E.sinCausa)}</td><td style="text-align:right">${liqMoney(E.faltaTrabajo)}</td><td style="text-align:right">${liqMoney(E.conCausa)}</td></tr>
+        </tbody></table></div></div>
+
+    <div class="cgrid">
+      <div class="cc"><div class="ct">Simulador de arreglo</div><div class="cs">Porcentaje sobre el total del despido sin causa (${liqMoney(E.sinCausa)})</div>
+        <table><thead><tr><th>%</th><th style="text-align:right">Se paga</th><th style="text-align:right">Diferencia vs. sin causa</th><th></th></tr></thead>
+        <tbody>${pcts.map(filaArr).join('')}
+          <tr class="liq-noprint"><td><input class="sinput" type="number" id="liq-pct" min="0" max="150" step="1" value="${pLibre}" style="width:70px" oninput="liqRender(Number(this.value))"> %</td>
+          <td style="text-align:right"><strong>${liqMoney(E.sinCausa*pLibre/100)}</strong></td><td style="text-align:right;color:var(--c)">${liqMoney(E.sinCausa - E.sinCausa*pLibre/100)}</td><td>${E.sinCausa*pLibre/100 < E.conCausa?'<span class="pill" style="background:rgba(247,95,95,.15);color:var(--d)">Menos que la liquidación final</span>':''}</td></tr>
+        </tbody></table>
+        <div style="font-size:11px;color:var(--dim);margin-top:10px">La liquidación final (${liqMoney(E.conCausa)}) se debe en cualquier caso: un arreglo por debajo de ese monto no la cubre.</div>
+      </div>
+      <div class="cc"><div class="ct">Referencia: arreglos anteriores</div><div class="cs">Hoja Negociaciones · % pagado = Monto negociado ÷ Indemnización de ley · últimos 3 años</div>
+        <table><thead><tr><th>Grupo</th><th style="text-align:center">Casos</th><th style="text-align:right">% promedio</th><th style="text-align:right">Aplicado a este caso</th></tr></thead>
+        <tbody>${hist.map(h => `<tr><td>${escHtml(h.lbl)}</td><td style="text-align:center">${h.n}</td><td style="text-align:right">${h.p==null?'—':liqPct(h.p)}</td><td style="text-align:right">${h.p==null?'—':liqMoney(E.sinCausa*h.p/100)}</td></tr>`).join('')}</tbody></table>
+        <div style="font-size:11px;color:var(--dim);margin-top:10px">Ojo: en Negociaciones el % está calculado sobre la "Indem Ley" que se registró en cada caso, que puede no incluir los mismos rubros que este total.</div>
+      </div>
+    </div>
+
+    <div class="tcard"><div class="thead"><div><div class="ct">Cómo se calculó la base</div>
+      <div class="cs" style="margin:0">Mejor mes: ${r.mejorMes} · fijos ${liqMoney(r.mesFijo)} + no remunerativos ${liqMoney(r.mesNorem)} + variables habituales ${liqMoney(r.promVariables)} = <strong>${liqMoney(r.base)}</strong>
+      ${r.tope?` · Tope ${escHtml(emp['Convenio']||'')}: ${liqMoney(r.tope)}${r.topeDesde?' (desde '+r.topeDesde+(r.topeFuente?', '+escHtml(r.topeFuente):'')+')':''}`:' · Sin tope cargado'}</div></div></div>
+      <div style="overflow-x:auto"><table><thead><tr><th>Concepto del mejor mes</th><th>Tipo</th><th style="text-align:right">Monto</th></tr></thead><tbody>${conceptosMes||'<tr><td colspan="3">—</td></tr>'}</tbody></table></div>
+      <div style="overflow-x:auto;border-top:1px solid var(--border)"><table><thead><tr><th>Concepto variable</th><th style="text-align:center">Meses cobrado</th><th style="text-align:right">Prom. 6 meses</th><th style="text-align:right">Prom. 12 meses</th><th style="text-align:right">Se toma</th><th>Criterio</th></tr></thead><tbody>${varRows}</tbody></table></div>
+      <div style="padding:14px 18px;font-size:12px;color:var(--mid);border-top:1px solid var(--border)">
+        Sueldo normal (para preaviso, días y vacaciones): último mes con datos (${r.ultimoMes}) + variables habituales = <strong>${liqMoney(r.sueldoNormal)}</strong>.
+        Vacaciones: ${r.diasVacAnio} días por antigüedad × ${r.diasTrabAnio}/365 días trabajados en el año = ${r.vacProp.toLocaleString('es-AR')} días proporcionales.
+        ${r.sinClasificar.length?'<br>Conceptos sin clasificar: '+escHtml(r.sinClasificar.join(', '))+'.':''}
+      </div>
+    </div>
+
+    <div style="font-size:11px;color:var(--dim);line-height:1.6;margin-bottom:30px">
+      Estimación para negociar: no reemplaza la liquidación oficial ni el asesoramiento legal. Montos brutos, antes de aportes y Ganancias.
+      Criterios: art. 245 LCT según Ley 27.802 (sin SAC, vacaciones ni premios no mensuales; variables con 6+ meses de cobro; tope del CCT con piso del 67 %),
+      sumas no remunerativas incluidas, viáticos de Camioneros excluidos, período de prueba de 6 meses. No incluye multas ni rubros por reclamos.
+    </div>`;
+  const inp = document.getElementById('liq-pct');
+  if(pctLibre != null && inp){ inp.focus(); const v = inp.value; inp.value=''; inp.value=v; }
 }
 
 // Registro de Service Worker para instalar como app (PWA)
