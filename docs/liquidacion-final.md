@@ -1,4 +1,4 @@
-Calculadora de liquidación final del panel HRnini: qué calcula, con qué criterios, de dónde saca los datos y cómo se mantiene. Última actualización: 25/11/2026.
+Calculadora de liquidación final del panel HRnini: qué calcula, con qué criterios, de dónde saca los datos y cómo se mantiene. Última actualización: 25/11/2026 (se quitó el art. 247 y se simplificaron las vacaciones).
 
 # Liquidación final (panel HRnini)
 
@@ -6,7 +6,8 @@ Calculadora de liquidación final del panel HRnini: qué calcula, con qué crite
 Estimar cuánto cobraría una persona según cómo termine la relación, para preparar una negociación. La ve **solo el rol administrador**.
 
 - Se escribe el legajo o el nombre y se completan unos pocos datos.
-- La calculadora muestra tres escenarios y un simulador de arreglo.
+- La calculadora muestra dos escenarios (sin causa y con causa o renuncia) y un simulador de arreglo.
+- No calcula el art. 247 (falta de trabajo): la empresa no paga de esa manera (decisión del 25/11/2026).
 
 **Es una estimación para negociar.** No reemplaza la liquidación oficial del liquidador ni el asesoramiento legal. Los montos son brutos: antes de aportes y de Ganancias.
 
@@ -16,19 +17,18 @@ Estimar cuánto cobraría una persona según cómo termine la relación, para pr
 | Legajo o nombre | Busca a la persona en la nómina. |
 | Fecha de egreso | Define antigüedad, días del mes, SAC y vacaciones. |
 | ¿Se otorgó preaviso? | Si ya se preavisó, no se pagan preaviso ni integración. |
-| Vacaciones pendientes de años anteriores | Días que no gozó de años anteriores (se suman). |
-| Vacaciones de este año ya gozadas | Se descuentan de las proporcionales del año. La calculadora avisa si ve conceptos de vacaciones en los sueldos del año. |
+| Días de vacaciones de este año ya gozados | Los días que corresponden se calculan solos por antigüedad. Solo se carga lo que ya se tomó, y se descuenta. La calculadora avisa si ve conceptos de vacaciones en los sueldos del año. |
 | Tope del convenio (opcional) | Reemplaza el tope de la hoja Topes solo para ese cálculo. |
 
 ## Escenarios
-| Rubro | Sin causa (art. 245) | Falta de trabajo (art. 247) | Con causa / renuncia |
-|---|---|---|---|
-| Indemnización por antigüedad | 100 % | 50 % | — |
-| Preaviso (si no se otorgó) + SAC | Sí | Sí | — |
-| Integración del mes de despido + SAC | Sí | Sí | — |
-| Días trabajados del mes | Sí | Sí | Sí |
-| SAC proporcional | Sí | Sí | Sí |
-| Vacaciones no gozadas + SAC | Sí | Sí | Sí |
+| Rubro | Sin causa (art. 245) | Con causa / renuncia |
+|---|---|---|
+| Indemnización por antigüedad | Sí | — |
+| Preaviso (si no se otorgó) + SAC | Sí | — |
+| Integración del mes de despido + SAC | Sí | — |
+| Días trabajados del mes | Sí | Sí |
+| SAC proporcional | Sí | Sí |
+| Vacaciones no gozadas + SAC | Sí | Sí |
 
 **Simulador de arreglo:**
 - Calcula el monto al 50, 60, 70, 80 y 100 %, más un porcentaje libre, **siempre sobre el total del despido sin causa** (decisión del 25/11/2026).
@@ -64,9 +64,10 @@ La Ley 27.802 rige desde el 06/03/2026. La cautelar de la CGT fue dejada sin efe
 - **Integración del mes:** lo que falta para completar el mes de egreso, si no se preavisó y el egreso no cae el último día. Más SAC.
 - **Días trabajados:** sueldo normal ÷ 30 × día de egreso. Si el egreso es el último día del mes, se paga el mes completo.
 - **SAC proporcional:** mejor remuneración del semestre ÷ 2 × días trabajados en el semestre ÷ días del semestre.
-- **Vacaciones:**
-  - Días por antigüedad al 31/12: 14, 21, 28 o 35.
-  - Se pagan proporcionales a los días trabajados en el año, menos los ya gozados, más los pendientes de años anteriores.
+- **Vacaciones (art. 156):**
+  - Días por antigüedad al 31/12 del año de egreso: hasta 5 años, 14 días; de 5 a 10, 21; de 10 a 20, 28; más de 20, 35.
+  - Se pagan proporcionales a los días trabajados en el año de egreso, menos los días ya gozados de ese año.
+  - Los años anteriores no se suman: por ley (art. 162) las vacaciones no se compensan en dinero, salvo el proporcional del año del egreso.
   - Valor del día: sueldo normal ÷ 25. Más SAC.
 - **No incluye** multas, rubros reclamables ni intereses.
 

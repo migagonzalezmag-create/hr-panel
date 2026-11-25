@@ -225,7 +225,7 @@ const LIQ = (() => {
     const diasTrabAnio = diasEntre(desdeAnio, egreso) + 1;
     const vacProp = diasVacAnio * diasTrabAnio / 365;
     const gozadas = Math.max(0, Number(p.vacGozadasAnio) || 0);
-    const pendientes = Math.max(0, Number(p.vacPendientes) || 0);
+    const pendientes = Math.max(0, Number(p.vacPendientes) || 0);   // por defecto 0: por ley solo se paga el proporcional del año (art. 156)
     const vacDias = Math.round((Math.max(0, vacProp - gozadas) + pendientes) * 100) / 100;
     const valorDiaVac = sueldoNormal / 25;
     const vacaciones = r2(vacDias * valorDiaVac);
@@ -234,7 +234,7 @@ const LIQ = (() => {
 
     const sacSobre = (x) => r2(x / 12);
     const rub = {
-      indem245, indem247: r2(indem245 * 0.5),
+      indem245,
       preaviso, sacPreaviso: sacSobre(preaviso),
       integracion, sacIntegracion: sacSobre(integracion),
       diasTrab, sacProp, vacaciones, sacVacaciones: sacSobre(vacaciones),
@@ -243,7 +243,6 @@ const LIQ = (() => {
     const indemnizatorios = r2(rub.preaviso + rub.sacPreaviso + rub.integracion + rub.sacIntegracion);
     const escenarios = {
       sinCausa: r2(rub.indem245 + indemnizatorios + final),
-      faltaTrabajo: r2(rub.indem247 + indemnizatorios + final),
       conCausa: final,
     };
 
@@ -256,7 +255,7 @@ const LIQ = (() => {
       ultimoMes: ultimo, mesesConDatos: conDatos, variables, promVariables: r2(promVariables),
       tope, topeDesde: tv.desde ? fmtF(tv.desde) : '', topeFuente: tv.fuente, topeAplicado, pisoAplicado, baseTopeada,
       mesesPreaviso, diasSem, totalSem, mejorSem: r2(mejorSem), mesMejorSem,
-      diasVacAnio, diasTrabAnio, vacProp: r2(vacProp), vacDias, valorDiaVac: r2(valorDiaVac),
+      diasVacAnio, diasTrabAnio, vacProp: r2(vacProp), vacGozadas: gozadas, antigVac: antig31.anios, vacDias, valorDiaVac: r2(valorDiaVac),
       rubros: rub, final, indemnizatorios, escenarios, notas, sinClasificar: sinClas,
     };
   }

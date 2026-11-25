@@ -3184,7 +3184,7 @@ async function liquidacionTab(el){
   const opciones = (employees||[]).map(e => `<option value="${escHtml(String(e['Legajo']).trim())} — ${escHtml(e['Nombre']||'')}"></option>`).join('');
 
   el.innerHTML = `<div class="sec active" id="liq-sec">
-    <div class="sh"><div><h2>Liquidación final</h2><p>Estimación para negociar · despido sin causa, falta de trabajo, con causa y arreglos</p></div>
+    <div class="sh"><div><h2>Liquidación final</h2><p>Estimación para negociar · despido sin causa, con causa o renuncia y arreglos</p></div>
       <button class="btn bts liq-noprint" onclick="window.print()">🖨️ Imprimir</button></div>
 
     <div class="fcard liq-noprint">
@@ -3196,9 +3196,9 @@ async function liquidacionTab(el){
         <div><div class="klbl">¿Se otorgó preaviso?</div>
           <select class="sinput" id="liq-preaviso" style="width:100%"><option value="no">No (se paga)</option><option value="si">Sí (ya preavisado)</option></select></div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:12px;align-items:end;margin-top:12px">
-        <div><div class="klbl">Vacaciones pendientes de años anteriores (días)</div><input class="sinput" type="number" min="0" step="1" id="liq-vacpend" value="0" style="width:100%"></div>
-        <div><div class="klbl">Vacaciones de este año ya gozadas (días)</div><input class="sinput" type="number" min="0" step="1" id="liq-vacgoz" value="0" style="width:100%"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:end;margin-top:12px">
+        <div><div class="klbl">Días de vacaciones de este año ya gozados</div><input class="sinput" type="number" min="0" step="1" id="liq-vacgoz" value="0" style="width:100%">
+          <div style="font-size:10px;color:var(--dim);margin-top:4px">Los días que corresponden se calculan solos según la antigüedad. Solo cargá lo que ya se tomó.</div></div>
         <div><div class="klbl">Tope del convenio (opcional, pisa la hoja Topes)</div><input class="sinput" type="number" min="0" step="0.01" id="liq-tope" placeholder="Usar hoja Topes" style="width:100%"></div>
         <button class="btn btp" onclick="liqCalcular()">Calcular</button>
       </div>
@@ -3241,7 +3241,7 @@ async function liqCalcular(){
       topes: liqCfg.topes,
       topeManual: Number(document.getElementById('liq-tope').value) || 0,
       preavisoOtorgado: document.getElementById('liq-preaviso').value === 'si',
-      vacPendientes: document.getElementById('liq-vacpend').value,
+      vacPendientes: 0,
       vacGozadasAnio: document.getElementById('liq-vacgoz').value,
     });
   } catch(e){ out.innerHTML = `<div class="alert" style="background:rgba(247,95,95,.1);color:var(--d)">❌ ${escHtml(e.message)}</div>`; return; }
@@ -3273,8 +3273,8 @@ function liqRender(pctLibre){
   const out = document.getElementById('liq-out');
   const ant = r.antig;
   const antTxt = `${ant.anios} años, ${ant.meses} meses y ${ant.dias} días`;
-  const fila = (lbl, a, b, c, nota) => `<tr><td>${lbl}${nota?`<div style="font-size:10px;color:var(--dim)">${nota}</div>`:''}</td>
-    <td style="text-align:right">${a===null?'—':liqMoney(a)}</td><td style="text-align:right">${b===null?'—':liqMoney(b)}</td><td style="text-align:right">${c===null?'—':liqMoney(c)}</td></tr>`;
+  const fila = (lbl, a, c, nota) => `<tr><td>${lbl}${nota?`<div style="font-size:10px;color:var(--dim)">${nota}</div>`:''}</td>
+    <td style="text-align:right">${a===null?'—':liqMoney(a)}</td><td style="text-align:right">${c===null?'—':liqMoney(c)}</td></tr>`;
 
   const pcts = [50,60,70,80,100];
   const pLibre = pctLibre != null ? pctLibre : (Number(document.getElementById('liq-pct')?.value) || 65);
@@ -3306,7 +3306,6 @@ function liqRender(pctLibre){
 
     <div class="kgrid">
       <div class="kcard"><div class="klbl">Despido sin causa (art. 245)</div><div class="kval" style="font-size:22px">${liqMoney(E.sinCausa)}</div></div>
-      <div class="kcard"><div class="klbl">Falta de trabajo (art. 247)</div><div class="kval" style="font-size:22px">${liqMoney(E.faltaTrabajo)}</div></div>
       <div class="kcard"><div class="klbl">Con causa / renuncia</div><div class="kval" style="font-size:22px">${liqMoney(E.conCausa)}</div></div>
       <div class="kcard"><div class="klbl">Base indemnizatoria</div><div class="kval" style="font-size:22px">${liqMoney(r.baseTopeada)}</div>
         <div style="font-size:11px;color:var(--dim)">${r.topeAplicado?(r.pisoAplicado?'Tope con piso del 67 % (Vizzoti)':'Con tope del convenio'):'Sin tope (la base no supera el tope)'}</div></div>
@@ -3314,18 +3313,18 @@ function liqRender(pctLibre){
 
     <div class="tcard"><div class="thead"><div class="ct">Liquidación por escenario</div></div>
       <div style="overflow-x:auto"><table>
-        <thead><tr><th>Rubro</th><th style="text-align:right">Sin causa</th><th style="text-align:right">Falta de trabajo</th><th style="text-align:right">Con causa / renuncia</th></tr></thead>
+        <thead><tr><th>Rubro</th><th style="text-align:right">Sin causa</th><th style="text-align:right">Con causa / renuncia</th></tr></thead>
         <tbody>
-          ${fila('Indemnización por antigüedad', R.indem245, R.indem247, null, `${liqMoney(r.baseTopeada)} × ${r.antig.aniosIndemn}${R.indem247?' · art. 247: 50 %':''}`)}
-          ${fila('Preaviso', R.preaviso, R.preaviso, null, r.rubros.preaviso? `${r.mesesPreaviso} ${r.mesesPreaviso===1?'mes':'meses'} × ${liqMoney(r.sueldoNormal)}` : 'No corresponde o ya se otorgó')}
-          ${fila('SAC sobre preaviso', R.sacPreaviso, R.sacPreaviso, null)}
-          ${fila('Integración del mes de despido', R.integracion, R.integracion, null)}
-          ${fila('SAC sobre integración', R.sacIntegracion, R.sacIntegracion, null)}
-          ${fila('Días trabajados del mes', R.diasTrab, R.diasTrab, R.diasTrab)}
-          ${fila('SAC proporcional', R.sacProp, R.sacProp, R.sacProp, `${liqMoney(r.mejorSem)} ÷ 2 × ${r.diasSem}/${r.totalSem} días (mejor mes del semestre: ${r.mesMejorSem})`)}
-          ${fila('Vacaciones no gozadas', R.vacaciones, R.vacaciones, R.vacaciones, `${r.vacDias.toLocaleString('es-AR')} días × ${liqMoney(r.valorDiaVac)} (sueldo ÷ 25)`)}
-          ${fila('SAC sobre vacaciones', R.sacVacaciones, R.sacVacaciones, R.sacVacaciones)}
-          <tr style="font-weight:700"><td>Total bruto</td><td style="text-align:right">${liqMoney(E.sinCausa)}</td><td style="text-align:right">${liqMoney(E.faltaTrabajo)}</td><td style="text-align:right">${liqMoney(E.conCausa)}</td></tr>
+          ${fila('Indemnización por antigüedad', R.indem245, null, `${liqMoney(r.baseTopeada)} × ${r.antig.aniosIndemn}`)}
+          ${fila('Preaviso', R.preaviso, null, r.rubros.preaviso? `${r.mesesPreaviso} ${r.mesesPreaviso===1?'mes':'meses'} × ${liqMoney(r.sueldoNormal)}` : 'No corresponde o ya se otorgó')}
+          ${fila('SAC sobre preaviso', R.sacPreaviso, null)}
+          ${fila('Integración del mes de despido', R.integracion, null)}
+          ${fila('SAC sobre integración', R.sacIntegracion, null)}
+          ${fila('Días trabajados del mes', R.diasTrab, R.diasTrab)}
+          ${fila('SAC proporcional', R.sacProp, R.sacProp, `${liqMoney(r.mejorSem)} ÷ 2 × ${r.diasSem}/${r.totalSem} días (mejor mes del semestre: ${r.mesMejorSem})`)}
+          ${fila('Vacaciones no gozadas', R.vacaciones, R.vacaciones, `${r.diasVacAnio} días por ${r.antigVac} años de antigüedad × ${r.diasTrabAnio}/365 días trabajados en el año = ${r.vacProp.toLocaleString('es-AR')}${r.vacGozadas?` − ${r.vacGozadas} ya gozados`:''} → ${r.vacDias.toLocaleString('es-AR')} días × ${liqMoney(r.valorDiaVac)} (sueldo ÷ 25)`)}
+          ${fila('SAC sobre vacaciones', R.sacVacaciones, R.sacVacaciones)}
+          <tr style="font-weight:700"><td>Total bruto</td><td style="text-align:right">${liqMoney(E.sinCausa)}</td><td style="text-align:right">${liqMoney(E.conCausa)}</td></tr>
         </tbody></table></div></div>
 
     <div class="cgrid">
