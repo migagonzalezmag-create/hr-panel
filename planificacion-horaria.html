@@ -369,14 +369,33 @@ td{padding:9px 12px;font-size:12px;border-bottom:1px solid rgba(30,38,64,.5)}
 <!-- ═══════════════════ JAVASCRIPT ═══════════════════ -->
 <script>
 // ─── CONFIG ──────────────────────────────────────────
-const USERS_URL = "https://script.google.com/macros/s/AKfycbxmQBrIe-bBFRidksFzWTx2JYf-LrVv7pGKnZdNmoFyOc3PqagjwNq6vavd6sKeQF4vGg/exec";
-const DATA_URL  = "https://script.google.com/macros/s/AKfycby9nJR5GZ3_1ZVm6HOMJBTF6vA8FOn_ioaL1rE7kOJbpKm_rCd4xcGR4yIgKdOSrjwvKQ/exec";
+// Mismo Apps Script que el panel HRnini (login en el servidor, datos con token).
+// Este archivo no guarda contraseñas ni datos de empleados.
+const DATA_URL = "https://script.google.com/macros/s/AKfycbxmQBrIe-bBFRidksFzWTx2JYf-LrVv7pGKnZdNmoFyOc3PqagjwNq6vavd6sKeQF4vGg/exec";
+const SESION_KEY = 'hrnini_sesion';
+let authToken = null;
 
-const EMBEDDED_USERS = [
-  {nombre:"Aiello Nicolas",contrasena:"Rh2026",rol:"admin",sector:"",sucursal:""},
-  {nombre:"Chazarreta Mauro",contrasena:"Depo2026",rol:"supervisor",sector:"DEPOSITO",sucursal:"La Plata"},
-  {nombre:"Gonzalez Miguel",contrasena:"Rh2026",rol:"admin",sector:"",sucursal:""}
-];
+async function api(payload){
+  const res = await fetch(DATA_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(Object.assign({}, payload, { token: authToken })),
+  });
+  const data = await res.json();
+  if(data && !Array.isArray(data) && data.error){
+    if(data.code === 'AUTH' && payload.action !== 'login'){
+      try { localStorage.removeItem(SESION_KEY); } catch(e){}
+      if(currentUser){ doLogout(); showToast('Tu sesión venció. Volvé a ingresar.', 'error'); }
+    }
+    const err = new Error(data.error); err.code = data.code; throw err;
+  }
+  return data;
+}
+async function hojaResp(hoja){
+  const data = await api({ action: 'datos', hoja });
+  return { ok: true, json: async () => data };
+}
+function conToken(payload){ return Object.assign({}, payload, { token: authToken }); }
 
 const PL_ROLES = {
   supervisor: {label:'Supervisor',  badge:'bs', tabs:['Planificación']},
@@ -385,7 +404,6 @@ const PL_ROLES = {
 };
 
 // ─── STATE ───────────────────────────────────────────
-let users = [];
 let currentUser = null;
 let role = null;
 let plEmpleados = [];
@@ -408,26 +426,30 @@ async function doLogin(){
   document.getElementById('login').style.display='none';
   document.getElementById('loading').style.display='flex';
 
-  await loadUsers();
-
-  const found = users.find(u =>
-    (u.nombre||'').trim().toLowerCase() === userVal &&
-    (u.contrasena||'').trim() === passVal
-  );
-
-  if(!found){
+  let r;
+  try {
+    r = await api({ action: 'login', usuario: userVal, contrasena: passVal });
+  } catch(e){
     document.getElementById('loading').style.display='none';
     document.getElementById('login').style.display='flex';
     errEl.style.display='block';
-    errEl.textContent='❌ Usuario o contraseña incorrectos';
+    errEl.textContent='❌ ' + (e.message || 'No se pudo conectar con el servidor');
     return;
   }
+  document.getElementById('inp-pass').value='';
+  authToken = r.token;
+  try { localStorage.setItem(SESION_KEY, JSON.stringify({ token: r.token, usuario: r.usuario, t: Date.now() })); } catch(e){}
+  await iniciarSesion(r.usuario);
+}
 
-  currentUser = found;
-  role = (found.rol||'analyst').trim().toLowerCase();
+async function iniciarSesion(usuario){
+  const errEl = document.getElementById('login-error');
+  currentUser = usuario;
+  role = (usuario.rol||'analyst').trim().toLowerCase();
 
   // Verificar que el rol tiene acceso a planificación
   if(!PL_ROLES[role]){
+    currentUser = null; role = null;
     document.getElementById('loading').style.display='none';
     document.getElementById('login').style.display='flex';
     errEl.style.display='block';
@@ -435,9 +457,8 @@ async function doLogin(){
     return;
   }
 
-  console.log(`🔑 Login: ${found.nombre} | rol: ${role} | sector: "${found.sector}" | sucursal: "${found.sucursal}"`);
-
-  // Cargar datos de empleados y turnos
+  document.getElementById('login').style.display='none';
+  document.getElementById('loading').style.display='flex';
   await loadPlanData();
 
   document.getElementById('loading').style.display='none';
@@ -445,33 +466,27 @@ async function doLogin(){
   buildApp();
 }
 
-async function loadUsers(){
+// Si ya se ingresó en el panel HRnini, entrar directo con esa sesión.
+async function restaurarSesion(){
+  let s = null;
+  try { s = JSON.parse(localStorage.getItem(SESION_KEY) || 'null'); } catch(e){}
+  if(!s || !s.token || (Date.now() - s.t) > 6*60*60*1000) return;
+  authToken = s.token;
   try {
-    const res = await fetch(USERS_URL + "?sheet=Usuarios");
-    if(res.ok){
-      const data = await res.json();
-      if(data && data.length > 0){
-        users = data.map(u => ({
-          nombre:     String(u['Usuario']||u['usuario']||'').trim(),
-          contrasena: String(u['Contraseña']||u['contrasena']||u['Contrasena']||'').trim(),
-          nombreReal: String(u['Nombre']||u['nombre']||'').trim(),
-          rol:        String(u['Rol']||u['rol']||'analyst').trim().toLowerCase(),
-          sector:     String(u['Sector']||u['sector']||'').trim(),
-          sucursal:   String(u['Sucursal']||u['sucursal']||'').trim(),
-        }));
-        console.log("✅ Usuarios en vivo:", users.length);
-        return;
-      }
-    }
-  } catch(e){ console.warn("Users fetch failed:", e.message); }
-  users = EMBEDDED_USERS;
-  console.log("✅ Usuarios embebidos:", users.length);
+    const r = await api({ action: 'yo' });
+    await iniciarSesion(r.usuario);
+  } catch(e){
+    authToken = null;
+    try { localStorage.removeItem(SESION_KEY); } catch(_){}
+    document.getElementById('loading').style.display='none';
+    document.getElementById('login').style.display='flex';
+  }
 }
 
 async function loadPlanData(){
   try {
     console.log('🚀 Cargando empleados (mod35071)...');
-    const r1 = await fetch(DATA_URL + '?sheet=mod35071');
+    const r1 = await hojaResp('mod35071');
     const d1 = await r1.json();
     console.log('✅ Empleados recibidos:', d1.length);
 
@@ -489,7 +504,7 @@ async function loadPlanData(){
     console.log('✅ Empleados procesados:', plEmpleados.length);
 
     console.log('🚀 Cargando turnos...');
-    const r2 = await fetch(DATA_URL + '?sheet=Turnos');
+    const r2 = await hojaResp('Turnos');
     const d2 = await r2.json();
     plTurnos = d2.map(t => ({
       codigo: String(t.Codigo || t.codigo || '').trim(),
@@ -504,7 +519,7 @@ async function loadPlanData(){
 
   // Intentar cargar planificaciones existentes
   try {
-    const r3 = await fetch(DATA_URL + '?sheet=Planificacion');
+    const r3 = await hojaResp('Planificacion');
     const d3 = await r3.json();
     if(d3 && Array.isArray(d3)){
       plPlanificaciones = d3;
@@ -517,6 +532,10 @@ async function loadPlanData(){
 }
 
 function doLogout(){
+  if(authToken){ api({ action: 'logout' }).catch(()=>{}); }
+  authToken = null;
+  try { localStorage.removeItem(SESION_KEY); } catch(e){}
+  plEmpleados = []; plPlanificaciones = [];
   currentUser = null;
   role = null;
   document.getElementById('app').style.display='none';
@@ -1350,8 +1369,8 @@ async function plConfirmarEnvio(){
   try {
     const res = await fetch(DATA_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(conToken(payload)),
     });
 
     // Apps Script redirige, usar mode no-cors como fallback
@@ -1381,7 +1400,7 @@ async function plConfirmarEnvio(){
 
       // Recargar planificaciones para que aparezcan en Aprobaciones
       try {
-        const r = await fetch(DATA_URL + '?sheet=Planificacion');
+        const r = await hojaResp('Planificacion');
         const d = await r.json();
         if(d && Array.isArray(d)) plPlanificaciones = d;
       } catch(e){}
@@ -1393,8 +1412,8 @@ async function plConfirmarEnvio(){
       await fetch(DATA_URL, {
         method: 'POST',
         mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(conToken(payload)),
       });
       const archivoBtn2 = generarArchivoSistema(filas);
       valDiv.innerHTML = `<div style="color:var(--c);font-weight:700;margin-bottom:8px">✅ Planificación enviada</div>
@@ -1552,15 +1571,15 @@ async function aprAccion(id, nuevoEstado){
     await fetch(DATA_URL, {
       method: 'POST',
       mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(conToken(payload)),
     });
 
     showToast(`${emoji} Planificación ${id} → ${nuevoEstado}`, 'success');
 
     // Recargar planificaciones
     try {
-      const r = await fetch(DATA_URL + '?sheet=Planificacion');
+      const r = await hojaResp('Planificacion');
       const d = await r.json();
       if(d && Array.isArray(d)) plPlanificaciones = d;
     } catch(e){}
@@ -1848,6 +1867,9 @@ if('serviceWorker' in navigator){
     navigator.serviceWorker.register('sw-planificacion.js').catch(() => {});
   });
 }
+
+// Si ya había sesión abierta (desde el panel HRnini), entrar directo
+restaurarSesion();
 </script>
 </body>
 </html>
