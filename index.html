@@ -382,7 +382,7 @@ async function doLogin(){
   const errEl = document.getElementById('login-error');
   errEl.style.display='none';
 
-  if(!userVal||!passVal){ errEl.style.display='block'; errEl.textContent='❌ Completá usuario y contraseña'; return; }
+  if(!userVal||!passVal){ errEl.style.display='block'; errEl.textContent='Completá usuario y contraseña'; return; }
 
   document.getElementById('login').style.display='none';
   document.getElementById('loading').style.display='flex';
@@ -394,7 +394,7 @@ async function doLogin(){
     document.getElementById('loading').style.display='none';
     document.getElementById('login').style.display='flex';
     errEl.style.display='block';
-    errEl.textContent = '❌ ' + (e.message || 'No se pudo conectar con el servidor');
+    errEl.textContent = '' + (e.message || 'No se pudo conectar con el servidor');
     return;
   }
   document.getElementById('inp-pass').value='';
@@ -722,7 +722,7 @@ function analystDash(el){
     const muestra = [...new Set(getActiveEmployees().slice(0,5).map(e=>e['Ubicación']||'(vacío)'))];
     el.innerHTML=`<div class="sec active">
     <div class="sh"><div><h2>Dashboard General</h2><p>Sin datos para tu sucursal</p></div></div>
-    <div class="empty"><div class="em">🏢</div>
+    <div class="empty"><div class="em"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 13l2.5-7h13L21 13v6H3z"/><path d="M3 13h5l1.5 2.5h5L16 13h5"/></svg></div>
     <p>No se encontraron empleados para la sucursal <strong>"${getUserSucursal()}"</strong>.</p>
     <p style="font-size:12px;color:var(--mid);margin-top:8px">Valores de "Ubicación" en la nómina: <strong>${muestra.join(', ')}</strong></p>
     <p style="font-size:12px;color:var(--dim);margin-top:4px">Verificá que el valor en la columna Sucursal de la hoja Usuarios coincida exactamente con el campo Ubicacion de la nómina.</p>
@@ -742,7 +742,7 @@ function analystDash(el){
   <div class="sh"><div><h2>Dashboard General</h2><p>Datos en tiempo real desde Google Sheets${sucTit} · ${total} registros cargados</p></div>
     <button class="btn bts" onclick="loadData().then(()=>renderTab('Dashboard'))">↻ Actualizar</button>
   </div>
-  <div class="ag alert">✅ Datos cargados correctamente desde Google Sheets — ${total} empleados activos${sucTit}</div>
+  <div class="ag alert">Datos cargados correctamente desde Google Sheets — ${total} empleados activos${sucTit}</div>
   <div class="kgrid">
     <div class="kcard ka"><div class="klbl">Headcount Total</div><div class="kval">${total}</div><span class="kchg cup">↑ Base activa</span></div>
     <div class="kcard kc"><div class="klbl">Sectores</div><div class="kval">${sectors}</div><span class="kchg cne">Áreas activas</span></div>
@@ -875,8 +875,8 @@ function showFichaEmpleado(legajo){
 
   const fotoUrl = getFotoUrl(legajo, 300);
   const fotoHtml = fotoUrl
-    ? `<img src="${fotoUrl}" style="width:160px;height:160px;border-radius:16px;object-fit:cover;border:2px solid var(--border);box-shadow:0 8px 32px rgba(0,0,0,.4)" onerror="this.outerHTML='<div style=\\'width:160px;height:160px;border-radius:16px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:48px;color:var(--dim)\\'>👤</div>'">`
-    : `<div style="width:160px;height:160px;border-radius:16px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:48px;color:var(--dim)">👤</div>`;
+    ? `<img src="${fotoUrl}" style="width:160px;height:160px;border-radius:16px;object-fit:cover;border:2px solid var(--border);box-shadow:0 8px 32px rgba(0,0,0,.4)" onerror="this.outerHTML='<div style=\\'width:160px;height:160px;border-radius:16px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:48px;color:var(--dim)\\'><svg width=&quot;64&quot; height=&quot;64&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.4&quot;><circle cx=&quot;12&quot; cy=&quot;8&quot; r=&quot;4&quot;/><path d=&quot;M4 21c1-4 4-6 8-6s7 2 8 6&quot;/></svg></div>'">`
+    : `<div style="width:160px;height:160px;border-radius:16px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:48px;color:var(--dim)"><svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg></div>`;
 
   const antig = calcAntig(e['Fecha Ingreso']);
 
@@ -891,7 +891,7 @@ function showFichaEmpleado(legajo){
     <div style="display:flex;flex-direction:column;align-items:center;gap:16px;margin-bottom:20px">
       ${fotoHtml}
       <div style="text-align:center">
-        <h3 style="font-family:Syne,sans-serif;font-size:18px;font-weight:800;margin-bottom:4px">${e['Nombre']||'-'}</h3>
+        <h3 style="font-family:Poppins,sans-serif;font-size:18px;font-weight:800;margin-bottom:4px">${e['Nombre']||'-'}</h3>
         <span style="color:var(--mid);font-size:13px">Legajo ${legajo}</span>
       </div>
     </div>
@@ -1044,7 +1044,7 @@ function myTeam(el){
   if(userSectors.length === 0){
     el.innerHTML=`<div class="sec active">
     <div class="sh"><div><h2>Mi Equipo</h2><p>Empleados bajo tu supervisión</p></div></div>
-    <div class="empty"><div class="em">⚠️</div><p>No tenés sectores asignados. Contactá a RRHH.</p></div>
+    <div class="empty"><div class="em"></div><p>No tenés sectores asignados. Contactá a RRHH.</p></div>
     </div>`;
     return;
   }
@@ -1112,7 +1112,7 @@ function novedadesTab(el){
   el.innerHTML=`<div class="sec active">
   <div class="sh"><div><h2>Cargar Novedad</h2><p>Informá situaciones de tu equipo</p></div></div>
   <div class="fcard">
-    <h3>📋 Nueva Novedad de Personal</h3>
+    <h3>Nueva Novedad de Personal</h3>
     <div class="fgrid">
       <div class="fg"><label>Sector</label>
         <select id="nov-sec" onchange="loadEmpSelect()">
@@ -1154,7 +1154,7 @@ function loadEmpSelect(){
 }
 
 function novListHTML(){
-  if(!novedades.length) return `<div class="empty"><div class="em">📂</div><p>Aún no enviaste novedades</p></div>`;
+  if(!novedades.length) return `<div class="empty"><div class="em"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 13l2.5-7h13L21 13v6H3z"/><path d="M3 13h5l1.5 2.5h5L16 13h5"/></svg></div><p>Aún no enviaste novedades</p></div>`;
   return `<table><thead><tr><th>Empleado</th><th>Sector</th><th>Tipo</th><th>Desde</th><th>Días</th><th>Estado</th></tr></thead>
   <tbody>${novedades.map(n=>`<tr>
     <td><strong>${n.nombre}</strong></td><td style="color:var(--mid)">${n.sector}</td>
@@ -1201,7 +1201,7 @@ function execDash(el){
   <div class="sh"><div><h2>Dashboard Ejecutivo</h2><p>Indicadores estratégicos del plantel${sucTit} · datos en vivo</p></div>
     <button class="btn bts" onclick="loadData().then(()=>renderTab('Ejecutivo'))">↻ Actualizar</button>
   </div>
-  <div class="ag alert">✅ ${total} empleados activos cargados desde Google Sheets en tiempo real</div>
+  <div class="ag alert">${total} empleados activos cargados desde Google Sheets en tiempo real</div>
   <div class="kgrid">
     <div class="kcard ka"><div class="klbl">Headcount Total</div><div class="kval">${total}</div><span class="kchg cup">Base activa</span></div>
     <div class="kcard kc"><div class="klbl">Antigüedad Prom.</div><div class="kval">${avgA.toFixed(1)}a</div><span class="kchg cup">Plantel consolidado</span></div>
@@ -1214,7 +1214,7 @@ function execDash(el){
     <div class="cc"><div class="ct">Top 6 Sectores</div><div class="cs">Por cantidad de empleados</div><canvas id="ch-exe-sec"></canvas></div>
   </div>
   <div class="chl">
-    <div style="font-family:Syne,sans-serif;font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px">Resumen Estratégico</div>
+    <div style="font-family:Poppins,sans-serif;font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px">Resumen Estratégico</div>
     <div class="chlg">
       <div class="ci"><h4>Plantel + antiguos (>10a)</h4><div class="amt">${emp_act.filter(e=>calcAntig(e['Fecha Ingreso'])>10).length}</div></div>
       <div class="ci"><h4>Incorporaciones recientes (<1a)</h4><div class="amt grn">${emp_act.filter(e=>calcAntig(e['Fecha Ingreso'])<1).length}</div></div>
@@ -1657,15 +1657,15 @@ async function ausentismoTab(el, mesSeleccionado=null){
 
   ${!mesSeleccionado && varDir !== 0 ? `
   <div class="alert ${varDir > 0 ? 'ad' : 'ag'}">
-    ${varDir > 0 ? '📈' : '📉'} Tasa de ausentismo 
+    ${varDir > 0 ? '▲' : '▼'} Tasa de ausentismo 
     <strong>${varDir > 0 ? 'aumentó' : 'bajó'} ${Math.abs(varDir)}%</strong> 
     respecto a ${d.mesPrevio} (era ${d.tasaPrevia}%)
   </div>` : ''}
 
   ${d.criticos && d.criticos.filter(c=>c.Motivo==='Suspension').length>0 ?
-    `<div class="alert ad">🚨 ${d.criticos.filter(c=>c.Motivo==='Suspension').reduce((a,b)=>a+b.count,0)} suspensiones en ${d.mesActual}</div>` : ''}
+    `<div class="alert ad">${d.criticos.filter(c=>c.Motivo==='Suspension').reduce((a,b)=>a+b.count,0)} suspensiones en ${d.mesActual}</div>` : ''}
   ${d.criticos && d.criticos.filter(c=>c.Motivo==='Accidente').length>0 ?
-    `<div class="alert aw">⚠️ ${d.criticos.filter(c=>c.Motivo==='Accidente').reduce((a,b)=>a+b.count,0)} accidentes en ${d.mesActual}</div>` : ''}
+    `<div class="alert aw">${d.criticos.filter(c=>c.Motivo==='Accidente').reduce((a,b)=>a+b.count,0)} accidentes en ${d.mesActual}</div>` : ''}
 
   <div class="kgrid">
     <div class="kcard kd"><div class="klbl">Tasa Ausentismo</div><div class="kval">${d.tasaAusentismo}%</div>
@@ -1841,9 +1841,9 @@ function verPerfilLicencia(legajo){
       <div class="kcard kw"><div class="klbl">Total eventos</div><div class="kval" style="font-size:22px">${emp.totalEventos}</div></div>
       <div class="kcard kb"><div class="klbl">Prom. días/evento</div><div class="kval" style="font-size:22px">${emp.totalEventos>0?Math.round(emp.totalDias/emp.totalEventos):0}</div></div>
     </div>
-    <h4 style="font-family:Syne,sans-serif;font-size:13px;font-weight:700;margin-bottom:10px">Días por Motivo</h4>
+    <h4 style="font-family:Poppins,sans-serif;font-size:13px;font-weight:700;margin-bottom:10px">Días por Motivo</h4>
     ${motivosHTML}
-    <h4 style="font-family:Syne,sans-serif;font-size:13px;font-weight:700;margin:16px 0 10px">Historial completo <span style="color:var(--dim);font-weight:400">(${ultimos.length} registros)</span></h4>
+    <h4 style="font-family:Poppins,sans-serif;font-size:13px;font-weight:700;margin:16px 0 10px">Historial completo <span style="color:var(--dim);font-weight:400">(${ultimos.length} registros)</span></h4>
     <div style="overflow-x:auto;overflow-y:auto;max-height:400px;border:1px solid var(--border);border-radius:8px"><table>
       <thead style="position:sticky;top:0;z-index:2"><tr><th>Fecha</th><th>Motivo</th><th>Días</th><th>Observación</th></tr></thead>
       <tbody>${ultimosHTML}</tbody>
@@ -1861,7 +1861,7 @@ function procesarAusentismo(input){
   const [anio, mes] = mesVal.split('-').map(Number);
   const res = document.getElementById('res-aus');
   const mesLabel = new Date(anio, mes-1, 1).toLocaleDateString('es-AR',{month:'long',year:'numeric'});
-  res.innerHTML = `<div style="color:var(--mid);font-size:12px">⏳ Procesando ${file.name}...</div>`;
+  res.innerHTML = `<div style="color:var(--mid);font-size:12px">Procesando ${file.name}...</div>`;
   const reader = new FileReader();
   reader.onload = function(e){
     try{
@@ -1893,7 +1893,7 @@ function procesarAusentismo(input){
       });
       const tasa = ((totalDias/(employees.length||794)/habiles)*100).toFixed(2);
       res.innerHTML = `
-        <div class="alert ag">✅ Ausentismo de ${mesLabel} procesado</div>
+        <div class="alert ag">Ausentismo de ${mesLabel} procesado</div>
         <div class="kgrid" style="margin-top:12px;grid-template-columns:repeat(4,1fr)">
           <div class="kcard ka"><div class="klbl">Días ausentes</div><div class="kval" style="font-size:20px">${totalDias}</div></div>
           <div class="kcard kd"><div class="klbl">Tasa</div><div class="kval" style="font-size:20px">${tasa}%</div></div>
@@ -1905,8 +1905,8 @@ function procesarAusentismo(input){
             <span>${m}</span><span style="font-weight:700;color:var(--a)">${d} días</span>
           </div>`).join('')}
         </div>
-        <p style="font-size:11px;color:var(--dim);margin-top:10px">💡 Pegá las filas en la hoja "Ausentismo" de Google Sheets con la columna Mes = ${mesVal}</p>`;
-    } catch(err){ res.innerHTML=`<div class="alert ad">❌ Error: ${err.message}</div>`; }
+        <p style="font-size:11px;color:var(--dim);margin-top:10px">Pegá las filas en la hoja "Ausentismo" de Google Sheets con la columna Mes = ${mesVal}</p>`;
+    } catch(err){ res.innerHTML=`<div class="alert ad">Error: ${err.message}</div>`; }
   };
   reader.readAsText(file,'UTF-8');
 }
@@ -1915,7 +1915,7 @@ function procesarLicencias(input){
   const file = input.files[0];
   if(!file) return;
   const res = document.getElementById('res-lic');
-  res.innerHTML=`<div style="color:var(--mid);font-size:12px">⏳ Procesando ${file.name}...</div>`;
+  res.innerHTML=`<div style="color:var(--mid);font-size:12px">Procesando ${file.name}...</div>`;
   const reader = new FileReader();
   reader.onload = function(e){
     try{
@@ -1927,8 +1927,8 @@ function procesarLicencias(input){
       const emps = new Set();
       lines.slice(1).forEach(l=>{ const v=l.split(','); if(v[legIdx]) emps.add(v[legIdx].trim()); });
       res.innerHTML=`
-        <div class="alert ag">✅ ${total.toLocaleString()} registros · ${emps.size} empleados</div>
-        <div class="alert aw" style="margin-top:8px">⚠️ Subí este archivo a la hoja "Licencias" en Google Sheets para actualizar el panel.</div>
+        <div class="alert ag">${total.toLocaleString()} registros · ${emps.size} empleados</div>
+        <div class="alert aw" style="margin-top:8px">Subí este archivo a la hoja "Licencias" en Google Sheets para actualizar el panel.</div>
         <div style="margin-top:12px;padding:14px;background:var(--surface2);border-radius:10px;font-size:12px">
           <strong style="display:block;margin-bottom:8px">Pasos:</strong>
           <ol style="padding-left:16px;line-height:2;color:var(--mid)">
@@ -1938,7 +1938,7 @@ function procesarLicencias(input){
             <li>Recargá con <strong style="color:var(--text)">Ctrl+Shift+R</strong></li>
           </ol>
         </div>`;
-    } catch(err){ res.innerHTML=`<div class="alert ad">❌ Error: ${err.message}</div>`; }
+    } catch(err){ res.innerHTML=`<div class="alert ad">Error: ${err.message}</div>`; }
   };
   reader.readAsText(file,'UTF-8');
 }
@@ -1947,16 +1947,16 @@ function procesarAltas(input){
   const file = input.files[0];
   if(!file) return;
   const res = document.getElementById('res-altas');
-  res.innerHTML = `<div style="color:var(--mid);font-size:12px">⏳ Procesando ${file.name}...</div>`;
+  res.innerHTML = `<div style="color:var(--mid);font-size:12px">Procesando ${file.name}...</div>`;
   const reader = new FileReader();
   reader.onload = function(e){
     try{
       const text = e.target.result;
       const lines = text.split('\n').filter(l=>l.trim());
-      if(lines.length < 2){ res.innerHTML=`<div class="alert ad">❌ Archivo vacío</div>`; return; }
+      if(lines.length < 2){ res.innerHTML=`<div class="alert ad">Archivo vacío</div>`; return; }
       const headers = lines[0].split(',').map(h=>h.trim().replace(/"/g,'').toLowerCase());
       const legajoIdx = headers.findIndex(h=>h.includes('legajo'));
-      if(legajoIdx === -1){ res.innerHTML=`<div class="alert ad">❌ No se encontró columna Legajo</div>`; return; }
+      if(legajoIdx === -1){ res.innerHTML=`<div class="alert ad">No se encontró columna Legajo</div>`; return; }
       const nuevos = [], duplicados = [];
       const legajosActuales = new Set(employees.map(e=>(e['Legajo']||'').toString().trim()));
       lines.slice(1).forEach(line=>{
@@ -1974,13 +1974,13 @@ function procesarAltas(input){
       if(nuevos.length > 0){
         employees.push(...nuevos);
         res.innerHTML=`
-          <div class="alert ag">✅ ${nuevos.length} empleado(s) agregado(s)</div>
-          ${duplicados.length>0?`<div class="alert aw">⚠️ ${duplicados.length} legajos ya existían</div>`:''}
-          <p style="font-size:11px;color:var(--dim);margin-top:8px">💡 Actualizá también tu Google Sheets para que los cambios sean permanentes.</p>`;
+          <div class="alert ag">${nuevos.length} empleado(s) agregado(s)</div>
+          ${duplicados.length>0?`<div class="alert aw">${duplicados.length} legajos ya existían</div>`:''}
+          <p style="font-size:11px;color:var(--dim);margin-top:8px">Actualizá también tu Google Sheets para que los cambios sean permanentes.</p>`;
       } else {
-        res.innerHTML=`<div class="alert aw">⚠️ No se encontraron empleados nuevos.</div>`;
+        res.innerHTML=`<div class="alert aw">No se encontraron empleados nuevos.</div>`;
       }
-    } catch(err){ res.innerHTML=`<div class="alert ad">❌ Error: ${err.message}</div>`; }
+    } catch(err){ res.innerHTML=`<div class="alert ad">Error: ${err.message}</div>`; }
   };
   reader.readAsText(file, 'UTF-8');
 }
@@ -2034,7 +2034,7 @@ function confirmarBaja(){
   document.getElementById('baja-motivo').value='';
   window._bajaSeleccionado = null;
   renderBajasTable();
-  document.getElementById('res-bajas').innerHTML=`<div class="alert ag">✅ Baja registrada correctamente</div>`;
+  document.getElementById('res-bajas').innerHTML=`<div class="alert ag">Baja registrada correctamente</div>`;
   setTimeout(()=>{ const el=document.getElementById('res-bajas'); if(el) el.innerHTML=''; }, 4000);
   showToast('Baja registrada: '+(emp['Nombre']||emp['Nombe']||''));
 }
@@ -2144,7 +2144,7 @@ async function licenciasTab(el){
     <div><h2>Licencias Históricas</h2><p>${totalRegistros.toLocaleString()} registros · ${totalEmpleados} empleados${sectorTitle}</p></div>
     <button class="btn bts" onclick="licenciasLoaded=false;licenciasTab(document.getElementById('content'))">↻ Actualizar</button>
   </div>
-  ${criticos.length>0?`<div class="alert aw">⚠️ ${criticos.length} empleados con más de 100 días históricos</div>`:''}
+  ${criticos.length>0?`<div class="alert aw">${criticos.length} empleados con más de 100 días históricos</div>`:''}
   <div class="kgrid">
     <div class="kcard ka"><div class="klbl">Total registros</div><div class="kval">${totalRegistros.toLocaleString()}</div></div>
     <div class="kcard kd"><div class="klbl">Total días</div><div class="kval">${totalDias.toLocaleString()}</div></div>
@@ -2184,7 +2184,7 @@ async function licenciasTab(el){
   <div id="lic-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;overflow-y:auto;padding:20px">
     <div style="max-width:700px;margin:0 auto;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-        <h3 id="modal-title" style="font-family:Syne,sans-serif;font-size:18px;font-weight:800"></h3>
+        <h3 id="modal-title" style="font-family:Poppins,sans-serif;font-size:18px;font-weight:800"></h3>
         <button class="btn bts" onclick="document.getElementById('lic-modal').style.display='none'">✕ Cerrar</button>
       </div>
       <div id="modal-content"></div>
@@ -2236,18 +2236,18 @@ function cargarDatosTab(el){
   <div class="sh"><div><h2>Cargar Datos</h2><p>Importá archivos para actualizar el panel</p></div></div>
 
   <div class="fcard">
-    <h3>👥 Dotación — Altas y Bajas</h3>
+    <h3>Dotación — Altas y Bajas</h3>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
       <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:18px">
-        <div style="font-family:Syne,sans-serif;font-size:13px;font-weight:700;margin-bottom:6px">📥 Importar Altas</div>
+        <div style="font-family:Poppins,sans-serif;font-size:13px;font-weight:700;margin-bottom:6px">Importar Altas</div>
         <p style="font-size:12px;color:var(--mid);margin-bottom:10px">Subí el CSV con nuevos empleados. Se agregan sin borrar los existentes.</p>
         <p style="font-size:11px;color:var(--dim);margin-bottom:10px">Columnas: <span style="color:var(--a)">Legajo, Nombre, Sector, Tarea, HORARIO, Convenio, Fecha Ingreso, sexo</span></p>
         <input type="file" id="file-altas" accept=".xlsx,.xls,.csv" style="display:none" onchange="procesarAltas(this)">
-        <button class="btn btp" onclick="document.getElementById('file-altas').click()">📂 Seleccionar archivo</button>
+        <button class="btn btp" onclick="document.getElementById('file-altas').click()">Seleccionar archivo</button>
         <div id="res-altas" style="margin-top:12px"></div>
       </div>
       <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:18px">
-        <div style="font-family:Syne,sans-serif;font-size:13px;font-weight:700;margin-bottom:6px">📤 Registrar Baja</div>
+        <div style="font-family:Poppins,sans-serif;font-size:13px;font-weight:700;margin-bottom:6px">Registrar Baja</div>
         <p style="font-size:12px;color:var(--mid);margin-bottom:10px">Buscá el empleado y registrá su baja.</p>
         <div class="fg" style="margin-bottom:10px">
           <label>Buscar empleado</label>
@@ -2285,7 +2285,7 @@ function cargarDatosTab(el){
   </div>
 
   <div class="fcard">
-    <h3>📋 Ausentismo Mensual</h3>
+    <h3>Ausentismo Mensual</h3>
     <p style="font-size:12px;color:var(--mid);margin-bottom:14px">Calculá el ausentismo de un mes. Luego pegá las filas en la hoja "Ausentismo" de Google Sheets con la columna Mes correspondiente.</p>
     <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:18px">
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
@@ -2304,7 +2304,7 @@ function cargarDatosTab(el){
         </div>
         <div style="padding-top:16px">
           <input type="file" id="file-aus" accept=".xlsx,.xls,.csv" style="display:none" onchange="procesarAusentismo(this)">
-          <button class="btn btp" onclick="document.getElementById('file-aus').click()">📂 Seleccionar</button>
+          <button class="btn btp" onclick="document.getElementById('file-aus').click()">Seleccionar</button>
         </div>
       </div>
       <div id="res-aus" style="margin-top:14px"></div>
@@ -2312,11 +2312,11 @@ function cargarDatosTab(el){
   </div>
 
   <div class="fcard">
-    <h3>🏥 Licencias Extendidas</h3>
-    <p style="font-size:12px;color:var(--mid);margin-bottom:14px"><strong style="color:var(--w)">⚠️ Este archivo reemplaza el anterior.</strong> Actualizá semanalmente.</p>
+    <h3>Licencias Extendidas</h3>
+    <p style="font-size:12px;color:var(--mid);margin-bottom:14px"><strong style="color:var(--w)">Este archivo reemplaza el anterior.</strong> Actualizá semanalmente.</p>
     <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:18px">
       <input type="file" id="file-lic" accept=".xlsx,.xls,.csv" style="display:none" onchange="procesarLicencias(this)">
-      <button class="btn btp" onclick="document.getElementById('file-lic').click()">📂 Seleccionar archivo</button>
+      <button class="btn btp" onclick="document.getElementById('file-lic').click()">Seleccionar archivo</button>
       <div id="res-lic" style="margin-top:14px"></div>
     </div>
   </div>
@@ -2417,7 +2417,7 @@ async function sueldosTab(el){
   if(!sueldos.length){
     el.innerHTML = `<div class="sec active">
       <div class="sh"><div><h2>Sueldos</h2></div></div>
-      <div class="alert ad">❌ No se pudieron cargar los datos de sueldos.</div>
+      <div class="alert ad">No se pudieron cargar los datos de sueldos.</div>
     </div>`;
     return;
   }
@@ -2560,10 +2560,10 @@ function renderSueldosMes(el, mesKey, mesesDisp, mesPrevio){
     ).join('')}
   </div>
 
-  ${sinSedeRows.length ? `<div class="alert aw">⚠️ ${resSede['sin sede'].emps} legajo(s) de sueldos no se encontraron en la Nómina (posibles bajas), así que no se les pudo asignar sede. Suman ${fmt(resSede['sin sede'].costo)}.</div>` : ''}
+  ${sinSedeRows.length ? `<div class="alert aw">${resSede['sin sede'].emps} legajo(s) de sueldos no se encontraron en la Nómina (posibles bajas), así que no se les pudo asignar sede. Suman ${fmt(resSede['sin sede'].costo)}.</div>` : ''}
 
   <!-- COMPARATIVA POR SEDE -->
-  <div style="font-family:Syne,sans-serif;font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;margin:4px 0 10px">Comparativa por sede</div>
+  <div style="font-family:Poppins,sans-serif;font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;margin:4px 0 10px">Comparativa por sede</div>
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:16px">
     ${sedesPresentes.map(s=>{
       const x = resSede[s];
@@ -2571,10 +2571,10 @@ function renderSueldosMes(el, mesKey, mesesDisp, mesPrevio){
       const clickable = s !== 'sin sede';
       return `<div class="cc" ${clickable?`onclick="cambiarSedeSueldos('${s}')"`:''} style="${clickable?'cursor:pointer;':''}${sel?'border-color:var(--a);box-shadow:0 0 0 1px var(--a);':''}">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <div class="ct">🏢 ${sedeLabel(s)}</div>
+          <div class="ct">${sedeLabel(s)}</div>
           <span class="pill ${s==='sin sede'?'pw':'pb'}">${pct(x.costo, resTotal.costo)} del costo</span>
         </div>
-        <div style="font-family:Syne,sans-serif;font-size:22px;font-weight:800;color:var(--a)">${fmt(x.costo)}</div>
+        <div style="font-family:Poppins,sans-serif;font-size:22px;font-weight:800;color:var(--a)">${fmt(x.costo)}</div>
         <div class="cs">Costo total empresa (bruto + aportes)</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
           ${mini('Empleados', x.emps)}
@@ -2631,7 +2631,7 @@ function renderSueldosMes(el, mesKey, mesesDisp, mesPrevio){
   </div>
 
   <!-- KPIs PRINCIPALES (sede filtrada) -->
-  <div style="font-family:Syne,sans-serif;font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;margin:20px 0 10px">Indicadores · ${sedeLabel(_sedeSueldos)}</div>
+  <div style="font-family:Poppins,sans-serif;font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;margin:20px 0 10px">Indicadores · ${sedeLabel(_sedeSueldos)}</div>
   <div class="kgrid">
     <div class="kcard ka"><div class="klbl">Costo Total Empresa</div><div class="kval" style="font-size:18px">${fmt(R.costo)}</div><span class="kchg cne">Bruto + Aportes</span></div>
     <div class="kcard kb"><div class="klbl">Masa Salarial Bruta</div><div class="kval" style="font-size:18px">${fmt(R.masa)}</div><span class="kchg cne">${R.emps} empleados</span></div>
@@ -2639,7 +2639,7 @@ function renderSueldosMes(el, mesKey, mesesDisp, mesPrevio){
     <div class="kcard kc"><div class="klbl">Costo Prom./Empleado</div><div class="kval" style="font-size:18px">${fmt(R.prom)}</div></div>
   </div>
 
-  <div style="font-family:Syne,sans-serif;font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;margin:16px 0 10px">Conceptos adicionales</div>
+  <div style="font-family:Poppins,sans-serif;font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;margin:16px 0 10px">Conceptos adicionales</div>
   <div class="kgrid">
     <div class="kcard kd"><div class="klbl">Horas Extra</div><div class="kval" style="font-size:18px">${fmt(R.extras)}</div><span class="kchg cdo">${pct(R.extras, R.masa)} de la masa</span></div>
     <div class="kcard kw"><div class="klbl">Feriados Trabajados</div><div class="kval" style="font-size:18px">${fmt(R.feriados)}</div><span class="kchg cne">${pct(R.feriados, R.masa, 2)} de la masa</span></div>
@@ -2806,7 +2806,7 @@ async function academiaTab(el){
   if(!academiaData){
     el.innerHTML = `<div class="sec active">
       <div class="sh"><div><h2>Academia Nini</h2><p>Sin conexión</p></div></div>
-      <div class="empty"><div class="em">📡</div><p>No se pudo conectar con Academia Nini. Verificá la conexión e intentá de nuevo.</p>
+      <div class="empty"><div class="em"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 8.5a15 15 0 0 1 20 0M5 12a10 10 0 0 1 14 0M8.5 15.5a5 5 0 0 1 7 0M12 19h.01M3 3l18 18"/></svg></div><p>No se pudo conectar con Academia Nini. Verificá la conexión e intentá de nuevo.</p>
       <button class="btn bts" style="margin-top:16px" onclick="academiaLoaded=false;academiaTab(document.getElementById('content'))">↻ Reintentar</button>
       </div></div>`;
     return;
@@ -2845,13 +2845,13 @@ async function academiaTab(el){
 
   // Colores de nivel
   const nivelColor = { bronce:'#cd7f32', plata:'#4B5563', oro:'#D97706', diamante:'#002E9D' };
-  const nivelIcon = { bronce:'🥉', plata:'🥈', oro:'🥇', diamante:'💎' };
+  const nivelIcon = { bronce:'<span style="color:#A0522D">●</span>', plata:'<span style="color:#8A93A3">●</span>', oro:'<span style="color:#C9A227">●</span>', diamante:'<span style="color:#002E9D">◆</span>' };
 
   el.innerHTML = `<div class="sec active">
   <div class="sh">
     <div><h2>Academia Nini</h2><p>Plataforma de capacitación interna${sectorTitle}</p></div>
     <div style="display:flex;gap:8px">
-      <a href="https://migagonzalezmag-create.github.io/academia-nini-empleados/" target="_blank" class="btn bts">🎓 Abrir Academia</a>
+      <a href="https://migagonzalezmag-create.github.io/academia-nini-empleados/" target="_blank" class="btn bts">Abrir Academia</a>
       <button class="btn bts" onclick="academiaLoaded=false;academiaTab(document.getElementById('content'))">↻ Actualizar</button>
     </div>
   </div>
@@ -2970,7 +2970,7 @@ async function negociacionesTab(el){
   } catch(e){
     el.innerHTML = `<div class="sec active">
       <div class="sh"><div><h2>Negociaciones</h2><p>Error de conexión</p></div></div>
-      <div class="empty"><div class="em">📡</div><p>No se pudo cargar la hoja Negociaciones. Verificá que exista en el Google Sheets.</p>
+      <div class="empty"><div class="em"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 8.5a15 15 0 0 1 20 0M5 12a10 10 0 0 1 14 0M8.5 15.5a5 5 0 0 1 7 0M12 19h.01M3 3l18 18"/></svg></div><p>No se pudo cargar la hoja Negociaciones. Verificá que exista en el Google Sheets.</p>
       <button class="btn bts" style="margin-top:16px" onclick="negociacionesTab(document.getElementById('content'))">↻ Reintentar</button>
       </div></div>`;
   }
@@ -3079,7 +3079,7 @@ function renderNegociaciones(el){
     <!-- RESUMEN POR AÑO -->
     <div class="card" style="margin-bottom:18px">
       <div style="padding:14px 18px;border-bottom:1px solid var(--border)">
-        <span style="font-family:Syne,sans-serif;font-size:13px;font-weight:700">Resumen por Año</span>
+        <span style="font-family:Poppins,sans-serif;font-size:13px;font-weight:700">Resumen por Año</span>
       </div>
       <div style="overflow-x:auto">
         <table>
@@ -3107,7 +3107,7 @@ function renderNegociaciones(el){
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px">
       <div class="card">
         <div style="padding:14px 18px;border-bottom:1px solid var(--border)">
-          <span style="font-family:Syne,sans-serif;font-size:13px;font-weight:700">Por Motivo</span>
+          <span style="font-family:Poppins,sans-serif;font-size:13px;font-weight:700">Por Motivo</span>
         </div>
         <div style="overflow-x:auto">
           <table>
@@ -3123,7 +3123,7 @@ function renderNegociaciones(el){
       </div>
       <div class="card">
         <div style="padding:14px 18px;border-bottom:1px solid var(--border)">
-          <span style="font-family:Syne,sans-serif;font-size:13px;font-weight:700">Top 10 Sectores</span>
+          <span style="font-family:Poppins,sans-serif;font-size:13px;font-weight:700">Top 10 Sectores</span>
         </div>
         <div style="overflow-x:auto">
           <table>
@@ -3142,7 +3142,7 @@ function renderNegociaciones(el){
     <!-- DETALLE -->
     <div class="card">
       <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-        <span style="font-family:Syne,sans-serif;font-size:13px;font-weight:700">Detalle de Negociaciones</span>
+        <span style="font-family:Poppins,sans-serif;font-size:13px;font-weight:700">Detalle de Negociaciones</span>
         <span style="font-size:12px;color:var(--dim)">${total} registros</span>
       </div>
       <div style="overflow-x:auto;max-height:500px;overflow-y:auto">
@@ -3403,14 +3403,14 @@ async function liquidacionTab(el){
   el.innerHTML = `<div class="sec active"><div class="sh"><div><h2>Liquidación final</h2><p>Cargando configuración...</p></div></div>
     <div style="display:flex;align-items:center;justify-content:center;padding:60px;gap:16px"><div class="spinner"></div></div></div>`;
   try { await liqCargarConfig(); }
-  catch(e){ el.innerHTML = `<div class="sec active"><div class="alert" style="background:rgba(232,25,17,.1);color:var(--d)">❌ No se pudo cargar la configuración: ${escHtml(e.message)}</div></div>`; return; }
+  catch(e){ el.innerHTML = `<div class="sec active"><div class="alert" style="background:rgba(232,25,17,.1);color:var(--d)">No se pudo cargar la configuración: ${escHtml(e.message)}</div></div>`; return; }
 
   const hoy = new Date(); const hoyISO = new Date(hoy.getTime() - hoy.getTimezoneOffset()*60000).toISOString().slice(0,10);
   const opciones = (employees||[]).map(e => `<option value="${escHtml(String(e['Legajo']).trim())} — ${escHtml(e['Nombre']||'')}"></option>`).join('');
 
   el.innerHTML = `<div class="sec active" id="liq-sec">
     <div class="sh"><div><h2>Liquidación final</h2><p>Estimación para negociar · despido sin causa, con causa o renuncia y arreglos</p></div>
-      <button class="btn bts liq-noprint" onclick="window.print()">🖨️ Imprimir</button></div>
+      <button class="btn bts liq-noprint" onclick="window.print()">Imprimir</button></div>
 
     <div class="fcard liq-noprint">
       <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;align-items:end">
@@ -3447,13 +3447,13 @@ function liqBuscarEmpleado(txt){
 async function liqCalcular(){
   const out = document.getElementById('liq-out');
   const emp = liqBuscarEmpleado(document.getElementById('liq-emp').value);
-  if(!emp){ out.innerHTML = '<div class="alert" style="background:rgba(217,119,6,.1);color:var(--w)">⚠️ No encontré a esa persona en la nómina.</div>'; return; }
-  if(emp._varios){ out.innerHTML = `<div class="alert" style="background:rgba(217,119,6,.1);color:var(--w)">⚠️ Hay ${emp._varios.length} personas que coinciden. Elegí una de la lista o escribí el legajo.</div>`; return; }
+  if(!emp){ out.innerHTML = '<div class="alert" style="background:rgba(217,119,6,.1);color:var(--w)">No encontré a esa persona en la nómina.</div>'; return; }
+  if(emp._varios){ out.innerHTML = `<div class="alert" style="background:rgba(217,119,6,.1);color:var(--w)">Hay ${emp._varios.length} personas que coinciden. Elegí una de la lista o escribí el legajo.</div>`; return; }
   const legajo = String(emp['Legajo']).trim();
   out.innerHTML = '<div style="display:flex;align-items:center;gap:14px;padding:30px"><div class="spinner"></div><span style="color:var(--mid)">Buscando los sueldos de ' + escHtml(emp['Nombre']) + '...</span></div>';
   let filas;
   try { filas = await api({ action:'sueldosLegajo', legajo }); }
-  catch(e){ out.innerHTML = `<div class="alert" style="background:rgba(232,25,17,.1);color:var(--d)">❌ ${escHtml(e.message)}</div>`; return; }
+  catch(e){ out.innerHTML = `<div class="alert" style="background:rgba(232,25,17,.1);color:var(--d)">${escHtml(e.message)}</div>`; return; }
 
   let r;
   try {
@@ -3469,7 +3469,7 @@ async function liqCalcular(){
       vacPendientes: 0,
       vacGozadasAnio: document.getElementById('liq-vacgoz').value,
     });
-  } catch(e){ out.innerHTML = `<div class="alert" style="background:rgba(232,25,17,.1);color:var(--d)">❌ ${escHtml(e.message)}</div>`; return; }
+  } catch(e){ out.innerHTML = `<div class="alert" style="background:rgba(232,25,17,.1);color:var(--d)">${escHtml(e.message)}</div>`; return; }
   liqUltimo = { r, emp };
   liqRender();
 }
@@ -3527,7 +3527,7 @@ function liqRender(pctLibre){
       </div>
     </div>
 
-    ${r.notas.map(n => `<div class="alert" style="background:rgba(217,119,6,.08);color:var(--w)">⚠️ ${escHtml(n)}</div>`).join('')}
+    ${r.notas.map(n => `<div class="alert" style="background:rgba(217,119,6,.08);color:var(--w)">${escHtml(n)}</div>`).join('')}
 
     <div class="kgrid">
       <div class="kcard"><div class="klbl">Despido sin causa (art. 245)</div><div class="kval" style="font-size:22px">${liqMoney(E.sinCausa)}</div></div>
