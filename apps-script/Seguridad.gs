@@ -43,7 +43,8 @@ var SEG = {
     'Negociaciones': { roles: ['admin', 'director'],                          modo: 'valores', filtro: null },
     // Liquidación final (solo administrador)
     'Topes':                { roles: ['admin'], modo: 'valores', filtro: null },
-    'ConceptosLiquidacion': { roles: ['admin'], modo: 'texto', filtro: null }
+    'ConceptosLiquidacion': { roles: ['admin'], modo: 'texto', filtro: null },
+    'Bajas':                { roles: ['admin', 'director'], modo: 'texto', filtro: null }
     // La hoja Usuarios no figura acá a propósito: no se entrega nunca.
   }
 };

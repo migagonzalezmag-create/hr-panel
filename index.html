@@ -451,7 +451,7 @@ function doLogout(){
   if(authToken){ api({ action: 'logout' }).catch(()=>{}); }
   authToken=null; borrarSesion();
   employees=[]; fotosMap={}; licencias=[]; licenciasLoaded=false; licenciasRaw=null; ausenciasRaw=[]; ausenciasLoaded=false; sueldos=[]; sueldosLoaded=false;
-  liqCfg=null; liqUltimo=null; inicioDatos=null; inicioSel=null; inicioVarCache=null;
+  liqCfg=null; liqUltimo=null; inicioDatos=null; inicioSel=null; inicioVarCache=null; bajasRaw=null;
   role=null; currentUser=null; novedades=[];
   destroyCharts();
   document.getElementById('app').style.display='none';
@@ -765,6 +765,128 @@ function dashTurno(h){
   return hr < 12 ? 'Mañana' : hr < 20 ? 'Tarde' : 'Noche';
 }
 
+// ── Rotación (hoja Bajas: solo administrador y dirección)
+let bajasRaw = null;
+async function loadBajas(){
+  if(bajasRaw) return bajasRaw;
+  if(!['admin','director'].includes(role)) return null;
+  try { bajasRaw = await api({ action:'datos', hoja:'Bajas' }); } catch(e){ console.warn('Bajas:', e.message); bajasRaw = null; }
+  return bajasRaw;
+}
+const ROT_MOTIVOS = [
+  {k:'REN', n:'Renuncia', f:m => m.startsWith('RENUNCIA')},
+  {k:'FPP', n:'Fin del período de prueba', f:m => m.includes('PERIODO DE PRUEBA') || m.includes('FIN PERIODO')},
+  {k:'DCC', n:'Despido con causa', f:m => m.includes('CON CAUSA')},
+  {k:'DSC', n:'Despido sin causa', f:m => m.includes('SIN CAUSA') || m === 'DESPIDO'},
+  {k:'ABA', n:'Abandono de trabajo', f:m => m.includes('ABANDONO')},
+  {k:'SCD', n:'Se considera despedido', f:m => m.includes('CONSIDERA')},
+  {k:'OTR', n:'Otros', f:() => true},
+];
+const rotMotivo = m => { const s = String(m||'').toUpperCase().trim(); return ROT_MOTIVOS.find(x => x.f(s)).k; };
+const ROT_TRAMOS = [ {n:'Menos de 3 meses', max:91}, {n:'3 a 6 meses', max:183}, {n:'6 a 12 meses', max:366}, {n:'1 a 2 años', max:731}, {n:'2 a 5 años', max:1827}, {n:'Más de 5 años', max:Infinity} ];
+
+function rotCalcular(emp, sedes){
+  const bajas = (bajasRaw||[]).map(b => ({
+    sede: String(b['Sede']||'').toUpperCase().includes('MORENO') ? 'MO' : 'LP',
+    ing: parseFecha(b['Fecha Ingreso']), egr: parseFecha(b['Fecha Egreso']),
+    motivo: rotMotivo(b['Motivo']), sector: String(b['Sector']||'Sin dato').trim(), nombre: b['Nombre']||'', legajo: b['Legajo']
+  })).filter(b => b.ing && b.egr && sedes.includes(b.sede));
+  if(!bajas.length) return null;
+  const hoy = new Date();
+  // últimos 12 meses completos (el mes en curso queda afuera)
+  const meses = []; for(let i=12;i>=1;i--){ const d = new Date(hoy.getFullYear(), hoy.getMonth()-i, 1); meses.push({ k: dashMesKey(d), ini: d, fin: new Date(d.getFullYear(), d.getMonth()+1, 0) }); }
+  const desde = meses[0].ini, hasta = meses[11].fin;
+  const minEgr = bajas.reduce((m,b) => b.egr < m ? b.egr : m, bajas[0].egr);
+  const activos = emp.map(e => ({ sede: dashSede(e), ing: parseFecha(e['Fecha Ingreso']) })).filter(a => a.ing);
+  // dotación en un día: activos que ya habían ingresado + bajas que ingresaron antes y se fueron después
+  const dot = (d, s) => activos.filter(a => (!s || a.sede === s) && a.ing <= d).length + bajas.filter(b => (!s || b.sede === s) && b.ing <= d && b.egr > d).length;
+  const porMes = (s) => meses.map(m => {
+    const B = bajas.filter(b => (!s || b.sede === s) && b.egr >= m.ini && b.egr <= m.fin);
+    const ing = activos.filter(a => (!s || a.sede === s) && a.ing >= m.ini && a.ing <= m.fin).length + bajas.filter(b => (!s || b.sede === s) && b.ing >= m.ini && b.ing <= m.fin).length;
+    const dp = (dot(new Date(m.ini.getTime()-86400000), s) + dot(m.fin, s)) / 2;
+    return { k: m.k, bajas: B.length, ingresos: ing, dot: dp, rot: dp ? B.length/dp*100 : 0 };
+  });
+  const res = (s) => {
+    const pm = porMes(s), b12 = bajas.filter(b => (!s || b.sede === s) && b.egr >= desde && b.egr <= hasta);
+    const dotProm = pm.reduce((t,m)=>t+m.dot,0)/pm.length;
+    const dias = b => Math.round((b.egr - b.ing)/86400000);
+    return { pm, b12, total: b12.length, dotProm, rotAnual: dotProm ? b12.length/dotProm*100 : 0,
+      menos6: b12.filter(b => dias(b) <= 183).length, menos3: b12.filter(b => dias(b) <= 91).length,
+      motivos: ROT_MOTIVOS.map(m => b12.filter(b => b.motivo === m.k).length),
+      tramos: ROT_TRAMOS.map((t,i) => b12.filter(b => { const d = dias(b); return d <= t.max && (i === 0 || d > ROT_TRAMOS[i-1].max); }).length),
+      ingresos12: pm.reduce((t,m)=>t+m.ingresos,0) };
+  };
+  const S = {}; sedes.forEach(s => S[s] = res(s));
+  return { meses, T: res(null), S, bajas, desde, hasta, completo: minEgr <= desde };
+}
+
+function rotHtml(R, sedes, ambas){
+  if(!R) return '';
+  const T = R.T, ult = T.pm[11], ant = T.pm[10];
+  const mesTxt = k => dashMesTxt(k).split(' ')[0];
+  const dif = ult.bajas - ant.bajas;
+  const chg = dif === 0 ? '<span class="kchg cne">Igual que el mes anterior</span>'
+    : `<span class="kchg" style="background:${dif>0?'rgba(232,25,17,.1)':'rgba(15,123,74,.1)'};color:${dif>0?'var(--d)':'var(--c)'}">${dif>0?'▲':'▼'} ${Math.abs(dif)} vs. ${mesTxt(ant.k)}</span>`;
+  const sub = t => `<div style="font-size:11.5px;color:var(--dim);margin-top:6px">${t}</div>`;
+  const porSede = f => ambas ? sub(sedes.map(s => `${DASH_SEDES[s].nombre} ${f(R.S[s])}`).join(' · ')) : '';
+  const periodo = `${dashMesCorto(R.meses[0].k)} a ${dashMesCorto(R.meses[11].k)}`;
+  const fila = (lbl, f, nota='') => `<tr><td>${lbl}${nota?`<div style="font-size:11px;color:var(--dim)">${nota}</div>`:''}</td>${(ambas?sedes:[]).map(s=>`<td style="text-align:right;font-weight:600">${f(R.S[s])}</td>`).join('')}<td style="text-align:right;${ambas?'color:var(--mid)':'font-weight:600'}">${f(T)}</td></tr>`;
+  return `
+  <div class="sh" style="margin-top:8px"><div><h2 style="font-size:22px">Rotación</h2><p>Últimos 12 meses completos (${periodo}) · hoja Bajas</p></div></div>
+  ${R.completo ? '' : '<div class="alert" style="background:rgba(217,119,6,.1);color:var(--w)">La hoja Bajas no cubre los 12 meses completos: la rotación puede quedar por debajo de la real.</div>'}
+  <div class="kgrid">
+    <div class="kcard kd"><div class="klbl">Rotación anual</div><div class="kval">${dashPct(T.rotAnual,1)}</div>${sub(`${dashNum(T.total)} bajas sobre una dotación promedio de ${dashNum(Math.round(T.dotProm))}`)}${porSede(s=>dashPct(s.rotAnual,1))}</div>
+    <div class="kcard kw"><div class="klbl">Bajas de ${mesTxt(ult.k)}</div><div class="kval">${dashNum(ult.bajas)}</div>${chg}${porSede(s=>dashNum(s.pm[11].bajas))}</div>
+    <div class="kcard ka"><div class="klbl">Se fueron antes de los 6 meses</div><div class="kval">${T.total ? dashPct(T.menos6/T.total*100,0) : '-'}</div>${sub(`${dashNum(T.menos6)} de ${dashNum(T.total)} bajas`)}${porSede(s=>s.total?dashPct(s.menos6/s.total*100,0):'-')}</div>
+  </div>
+  <div class="tcard" style="margin-bottom:16px"><div class="thead"><h3>Ingresos y bajas${ambas?' por sede':''}</h3><span style="font-size:12px;color:var(--dim)">${periodo}</span></div>
+    <div style="overflow-x:auto"><table><thead><tr><th>Indicador</th>${(ambas?sedes:[]).map(s=>`<th style="text-align:right">${DASH_SEDES[s].nombre}</th>`).join('')}<th style="text-align:right">Total</th></tr></thead><tbody>
+    ${fila('Ingresos', s=>dashNum(s.ingresos12), 'Incluye a los que ya se fueron')}
+    ${fila('Bajas', s=>dashNum(s.total))}
+    ${fila('Saldo (ingresos − bajas)', s=>{ const v = s.ingresos12 - s.total; return (v>0?'+':'') + dashNum(v); })}
+    ${fila('Dotación promedio', s=>dashNum(Math.round(s.dotProm)))}
+    ${fila('Rotación anual', s=>dashPct(s.rotAnual,1), 'Bajas sobre dotación promedio')}
+    ${fila('Bajas antes de los 3 meses', s=>dashNum(s.menos3)+(s.total?' ('+dashPct(s.menos3/s.total*100,0)+')':''))}
+    ${fila('Bajas antes de los 6 meses', s=>dashNum(s.menos6)+(s.total?' ('+dashPct(s.menos6/s.total*100,0)+')':''))}
+    ${ROT_MOTIVOS.map((m,i) => fila(m.n, s=>s.motivos[i] ? dashNum(s.motivos[i]) : '-')).join('')}
+    </tbody></table></div></div>
+  <div class="cgrid">
+    <div class="cc"><div class="ct">Rotación mensual</div><div class="cs">Bajas del mes sobre la dotación promedio del mes</div><div style="height:240px"><canvas id="ch-r-rot"></canvas></div></div>
+    <div class="cc"><div class="ct">Ingresos y bajas por mes</div><div class="cs">${ambas?'Ambas sedes':DASH_SEDES[sedes[0]].nombre}</div><div style="height:240px"><canvas id="ch-r-ib"></canvas></div></div>
+  </div>
+  <div class="cgrid">
+    <div class="cc"><div class="ct">¿Con cuánta antigüedad se van?</div><div class="cs">Bajas de los últimos 12 meses</div><div style="height:240px"><canvas id="ch-r-ant"></canvas></div></div>
+    <div class="cc"><div class="ct">Sectores con más bajas</div><div class="cs">Últimos 12 meses</div><div style="height:240px"><canvas id="ch-r-sect"></canvas></div></div>
+  </div>`;
+}
+
+function rotGraficos(R, sedes, ambas){
+  if(!R) return;
+  ['rRot','rIb','rAnt','rSect'].forEach(k => { if(charts[k]) { charts[k].destroy(); delete charts[k]; } });
+  const grid = '#E3E8F2', tick = '#5B6474';
+  const leyenda = {display:true, position:'bottom', labels:{color:'#4B5563', boxWidth:12, font:{size:11}}};
+  const labels = R.meses.map(m => dashMesCorto(m.k));
+  charts.rRot = new Chart(document.getElementById('ch-r-rot'), { type:'line',
+    data:{ labels, datasets: sedes.map(s => ({ label: DASH_SEDES[s].nombre, data: R.S[s].pm.map(m => +m.rot.toFixed(1)), borderColor: DASH_SEDES[s].color, backgroundColor: DASH_SEDES[s].color, tension:0, pointRadius:3, borderWidth:2 })) },
+    options:{ maintainAspectRatio:false, plugins:{ legend: ambas ? leyenda : {display:false}, tooltip:{ callbacks:{ label: c => `${c.dataset.label}: ${dashPct(c.parsed.y,1)}` } } },
+      scales:{ x:{ ticks:{color:tick}, grid:{display:false} }, y:{ beginAtZero:true, ticks:{ color:tick, callback: v => v + '%' }, grid:{color:grid} } } } });
+  charts.rIb = new Chart(document.getElementById('ch-r-ib'), { type:'bar',
+    data:{ labels, datasets:[
+      { label:'Ingresos', data: R.T.pm.map(m => m.ingresos), backgroundColor:'#002E9D', borderRadius:4 },
+      { label:'Bajas', data: R.T.pm.map(m => m.bajas), backgroundColor:'#E81911', borderRadius:4 } ] },
+    options:{ maintainAspectRatio:false, plugins:{ legend: leyenda }, scales:{ x:{ ticks:{color:tick}, grid:{display:false} }, y:{ beginAtZero:true, ticks:{color:tick, precision:0}, grid:{color:grid} } } } });
+  charts.rAnt = new Chart(document.getElementById('ch-r-ant'), { type:'bar', plugins:[dashEtiquetas],
+    data:{ labels: ROT_TRAMOS.map(t => t.n), datasets: sedes.map(s => ({ label: DASH_SEDES[s].nombre, data: R.S[s].tramos, backgroundColor: DASH_SEDES[s].color, borderRadius:4 })) },
+    options:{ indexAxis:'y', maintainAspectRatio:false, layout:{padding:{right:40}}, plugins:{ legend: ambas ? leyenda : {display:false} },
+      scales:{ x:{ stacked:true, beginAtZero:true, ticks:{color:tick, precision:0}, grid:{color:grid} }, y:{ stacked:true, ticks:{color:'#1F2937'}, grid:{display:false} } } } });
+  const cuenta = {}; R.T.b12.forEach(b => { cuenta[b.sector] = (cuenta[b.sector]||0) + 1; });
+  const sects = Object.keys(cuenta).sort((a,b) => cuenta[b] - cuenta[a]).slice(0, 8);
+  charts.rSect = new Chart(document.getElementById('ch-r-sect'), { type:'bar', plugins:[dashEtiquetas],
+    data:{ labels: sects, datasets: sedes.map(s => ({ label: DASH_SEDES[s].nombre, data: sects.map(k => R.S[s].b12.filter(b => b.sector === k).length), backgroundColor: DASH_SEDES[s].color, borderRadius:4 })) },
+    options:{ indexAxis:'y', maintainAspectRatio:false, layout:{padding:{right:40}}, plugins:{ legend: ambas ? leyenda : {display:false} },
+      scales:{ x:{ stacked:true, beginAtZero:true, ticks:{color:tick, precision:0}, grid:{color:grid} }, y:{ stacked:true, ticks:{color:'#1F2937', font:{size:11}, autoSkip:false}, grid:{display:false} } } } });
+}
+
 function dashTablaSectores(emp, sedes){
   const convs = DASH_CONV.filter(c => emp.some(e => dashConv(e) === c.clave));
   const sec = {}; emp.forEach(e => { const k = String(e['Sector']||'Sin dato').trim(); (sec[k] = sec[k] || []).push(e); });
@@ -786,10 +908,10 @@ function analystDash(el){
   }
   el.innerHTML = `<div class="sec active" id="dash-sec">
     <div class="sh"><div><h2>Dashboard</h2><p>Indicadores de gestión${sucTit} · nómina de ${dashNum(emp.length)} personas activas</p></div>
-      <button class="btn bts" onclick="ausenciasLoaded=false;licenciasLoaded=false;loadData().then(()=>renderTab('Dashboard'))">↻ Actualizar</button></div>
+      <button class="btn bts" onclick="ausenciasLoaded=false;licenciasLoaded=false;bajasRaw=null;loadData().then(()=>renderTab('Dashboard'))">↻ Actualizar</button></div>
     <div id="dash-out"><div style="display:flex;align-items:center;gap:14px;padding:30px"><div class="spinner"></div><span style="color:var(--mid)">Calculando indicadores...</span></div></div>
   </div>`;
-  Promise.all([loadAusencias().catch(()=>{}), loadLicencias().catch(()=>{})]).then(() => {
+  Promise.all([loadAusencias().catch(()=>{}), loadLicencias().catch(()=>{}), loadBajas().catch(()=>{})]).then(() => {
     if(!document.getElementById('dash-out')) return;
     dashRender(emp);
   });
@@ -906,7 +1028,9 @@ function dashRender(emp){
   })();
 
   const nSect = new Set(emp.map(e=>String(e['Sector']||'Sin dato').trim())).size;
-  out.innerHTML = `${kpis}${comp}
+  const ROT = bajasRaw ? rotCalcular(emp, sedes) : null;
+  out.innerHTML = `${kpis}${comp}${rotHtml(ROT, sedes, ambas)}
+  <div class="sh" style="margin-top:8px"><div><h2 style="font-size:22px">Plantel actual</h2><p>Ausentismo, ingresos, antigüedad, turnos y sectores</p></div></div>
   <div class="cgrid">
     <div class="cc"><div class="ct">Tasa de ausentismo por mes</div><div class="cs">Días de ausencia sobre días disponibles, según cada reporte mensual</div><div style="height:240px"><canvas id="ch-d-aus"></canvas></div></div>
     <div class="cc"><div class="ct">Ingresos por mes</div><div class="cs">Últimos 12 meses · solo personas que siguen activas</div><div style="height:240px"><canvas id="ch-d-ing"></canvas></div></div>
@@ -922,6 +1046,7 @@ function dashRender(emp){
   const leyenda = ambas ? {display:true, position:'bottom', labels:{color:'#4B5563', boxWidth:12, font:{size:11}}} : {display:false};
   const dsSede = (fnData, extra={}) => sedes.map(s => ({ label: DASH_SEDES[s].nombre, data: fnData(s), backgroundColor: DASH_SEDES[s].color, borderColor: DASH_SEDES[s].color, borderRadius:4, ...extra }));
   ['dAus','dIng','dAntig','dTurno','dSect'].forEach(k => { if(charts[k]) { charts[k].destroy(); delete charts[k]; } });
+  rotGraficos(ROT, sedes, ambas);
 
   // Ausentismo por mes y sede
   const mesesG = mesesAus.slice(-7);
