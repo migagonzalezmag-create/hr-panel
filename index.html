@@ -1230,6 +1230,60 @@ function fichaSeries(filas, mapa){
   return Object.keys(porMes).sort().map(k => ({ mes:k, total:porMes[k] }));
 }
 
+// ── Sanciones (reporte san_historialporlegajo pegado en la hoja Sanciones) ──
+// El hecho concreto sale del nombre del modelo usado: "2 AMONESTACION (Auto en playa de cli) - Ult. vez.rtf".
+// La Plata lo carga en docfalta; Moreno lo cargaba en docsancion. Se toma el que esté.
+const SAN_NULA = 401769;   // fecha "vacía" del sistema (año 2999)
+const SAN_HECHOS = [['LLEGADA TARDE','Llegada tarde'],['ASA','Ausente sin aviso'],['ACA','Ausente con aviso'],['NO FICH','No fichó ingreso/egreso/descanso'],
+  ['TIEMPO MUERTO','Tiempo muerto'],['MULTIUSO','Multiuso'],['VESTUARIO','Vestuario'],['CELULAR','Uso de celular'],['AURICULAR','Uso de auriculares'],
+  ['CASCO','Sin elementos de seguridad'],['CALZADO','Sin elementos de seguridad'],['ELEM','Sin elementos de seguridad'],['AUTO EN PLAYA','Auto en playa de clientes'],
+  ['CORTA CARRO','No corta carro'],['REPARTO','No termina el reparto'],['FALTANTE','Faltante (efectivo/mercadería)'],['SOBRANTE','Sobrante de mercadería'],
+  ['FACTURA','Error de facturación'],['EMPET','No concurre a EMPET'],['SANGRE','No realiza examen médico'],['FUMAR','Fumar'],['CAFETERIA','Cafetería'],
+  ['DESCANSO','Exceso de descanso'],['SALIDA','Salida anticipada'],['TARJETA','Olvido de tarjeta'],['ERROR OP','Error operativo'],['CAPUCHA','Capucha/gorro'],
+  ['NIEGA','Se niega a realizar tareas'],['DURMIENDO','Durmiendo'],['ABANDONA','Abandona tareas'],['BATERIA','Máquina con batería baja'],['MARCA PROD','No marca productos'],
+  ['CHOQUE','Choque en depósito'],['DESVIO','Desvío de recorrido'],['FICHADA','Error de fichada']];
+const SAN_POSITIVAS = ['anotacion positiva','anotación positiva','anotación especial','anotacion especial'];
+const SAN_ESCALA_ASA = [1,2,4,8,15];   // procedimientos/sanciones-escalas.md
+
+function sanFecha(v){
+  if(v === '' || v == null) return null;
+  if(typeof v === 'number'){ if(v >= SAN_NULA || v < 20000) return null; return new Date(Math.round((Math.floor(v) - 25569) * 86400000) + new Date().getTimezoneOffset()*60000); }
+  const s = String(v).trim(); let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return new Date(+m[1], +m[2]-1, +m[3]);
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); if(m) return new Date(+m[3], +m[2]-1, +m[1]);
+  return null;
+}
+function sanSinAcento(s){ return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase(); }
+function sanDetalle(doc){
+  const d = String(doc||'').replace(/\.rtf\s*$/i,'').trim();
+  if(!d) return { hecho:'', agravante:'' };
+  let hecho = '', resto = '';
+  const p = d.indexOf('(');
+  if(p >= 0){ const c = d.indexOf(')', p); hecho = d.slice(p+1, c >= 0 ? c : undefined); resto = c >= 0 ? d.slice(c+1) : ''; }
+  else if(/^NINI_/i.test(d)) hecho = d.split('_').slice(1).join(' ');
+  const H = sanSinAcento(hecho).replace(/\s+/g,' ').trim();
+  // Sin paréntesis (ej. "LLAM AT-AMON LLEGADA TARDE ACUMULADA"): solo se toma si coincide con un hecho conocido.
+  const regla = SAN_HECHOS.find(([k]) => (H || sanSinAcento(d)).includes(k));
+  const hechoTxt = regla ? regla[1] : (H ? H.charAt(0) + H.slice(1).toLowerCase() : '');
+  const R = sanSinAcento(resto);
+  const agravante = /C\.?\s*A?\s*DESP/.test(R) ? 'con apercibimiento de despido' : /U[LT][TL]/.test(R) ? 'última vez' : /REIT/.test(R) ? 'reiteradas' : '';
+  return { hecho: hechoTxt, agravante };
+}
+function sanProcesar(filas){
+  return (filas||[]).map(r => {
+    const tipo = String(r.sancion||'').trim();
+    const det = sanDetalle(r.docfalta || r.docsancion);
+    const esSusp = /^suspensi/i.test(tipo);
+    return { fecha: sanFecha(r.fecnov), tipo, motivo: String(r.motivo||'').trim(), hecho: det.hecho, agravante: det.agravante,
+      dias: esSusp ? (Number(r.diassusp)||0) : 0, desde: esSusp ? sanFecha(r.fecdessusp) : null, hasta: esSusp ? sanFecha(r.fecreinteg) : null,
+      esSusp, positiva: SAN_POSITIVAS.includes(tipo.toLowerCase()), descargo: !!String(r.descargo||'').trim() };
+  }).filter(s => s.fecha).sort((a,b) => b.fecha - a.fecha);
+}
+function sanPill(s){
+  const t = s.tipo.toLowerCase();
+  const cls = s.positiva ? 'pg' : s.esSusp ? 'pd' : t.includes('amonest') ? 'pw' : t.includes('contempl') || t.includes('sin sanc') ? 'pgy' : 'pb';
+  return `<span class="pill ${cls}">${escHtml(s.tipo)}</span>`;
+}
+
 async function fichaRender(legajo){
   const out = document.getElementById('ficha-out'); if(!out) return;
   const e = (employees||[]).find(x => String(x['Legajo']||'').trim() === legajo);
@@ -1238,7 +1292,9 @@ async function fichaRender(legajo){
   out.innerHTML = '<div style="display:flex;align-items:center;gap:14px;padding:30px"><div class="spinner"></div><span style="color:var(--mid)">Armando la ficha de ' + escHtml(e['Nombre']||'') + '...</span></div>';
 
   const esAdmin = role === 'admin';
-  const tareas = [loadAusencias().catch(()=>{}), loadLicencias().catch(()=>{})];
+  let filasSan = null, errSan = '';
+  const tareas = [loadAusencias().catch(()=>{}), loadLicencias().catch(()=>{}),
+    api({ action:'sancionesLegajo', legajo }).then(f => { filasSan = f; }).catch(err => { errSan = err.message; })];
   let filasSueldo = null, errSueldo = '';
   if(esAdmin){
     tareas.push(liqCargarConfig().catch(err => { errSueldo = err.message; }));
@@ -1313,6 +1369,16 @@ async function fichaRender(legajo){
     } catch(err){ errLiq = err.message; }
   }
 
+  // Sanciones
+  const sans = sanProcesar(Array.isArray(filasSan) ? filasSan : []);
+  const sanDisc = sans.filter(s => !s.positiva);
+  const san12 = sanDisc.filter(s => s.fecha >= desde12);
+  const anioHoy = hoy.getFullYear();
+  const diasSuspAnio = sanDisc.filter(s => s.esSusp && s.fecha.getFullYear() === anioHoy).reduce((t,s)=>t+s.dias,0);
+  const desde6 = new Date(hoy.getTime() - 183*fichaDia);
+  const asaSusp6 = sanDisc.filter(s => s.esSusp && s.fecha >= desde6 && (/sin aviso/i.test(s.motivo) || s.hecho === 'Ausente sin aviso')).length;
+  const proxAsa = asaSusp6 < SAN_ESCALA_ASA.length ? `${SAN_ESCALA_ASA[asaSusp6]} ${SAN_ESCALA_ASA[asaSusp6]===1?'día':'días'} de suspensión` : 'escala agotada (analizar con el sector)';
+
   // ── Armado ──
   const foto = getFotoUrl(legajo, 200);
   const ini = escHtml(avSafe(e['Nombre']||''));
@@ -1324,6 +1390,7 @@ async function fichaRender(legajo){
     enPrueba ? chip('En período de prueba hasta el ' + fF(finPrueba), '#B45309') : '',
     hito ? chip(`Cumple ${prox} años el ${fF(fechaProx)}`, '#002E9D') : '',
     liq && liq.variables.some(v => v.usado > 0) ? chip('Tiene variables habituales', '#0F7B4A') : '',
+    diasSuspAnio >= 20 ? chip(`${diasSuspAnio} días de suspensión en ${anioHoy} (tope 30)`, '#D2140D') : '',
   ].join('');
   const dato = (l, v) => `<div class="ficha-dato"><div class="klbl">${l}</div><div>${v}</div></div>`;
   const kpi = (cls, l, v, sub) => `<div class="kcard ${cls}"><div class="klbl">${l}</div><div class="kval">${v}</div>${sub?`<div style="font-size:11.5px;color:var(--dim);margin-top:6px">${sub}</div>`:''}</div>`;
@@ -1338,6 +1405,29 @@ async function fichaRender(legajo){
   const licMot = {}; misLic.forEach(r => { licMot[r.motivo] = (licMot[r.motivo]||0) + r.dias; });
   const licHtml = `<div class="cc"><div class="ct">Licencias</div><div class="cs">${misLic.length} ${misLic.length===1?'licencia':'licencias'} en el historial · ${licDias} días</div>
     ${misLic.length ? barras(licMot, 'var(--b)') + `<table style="margin-top:12px"><thead><tr><th>Inicio</th><th>Motivo</th><th>Días</th></tr></thead><tbody>${misLic.slice(0,6).map(r=>`<tr><td>${formatFecha(r.inicio)}</td><td>${escHtml(r.motivo)}${r.obs?`<div style="font-size:11px;color:var(--dim)">${escHtml(r.obs.slice(0,80))}</div>`:''}</td><td>${r.dias}</td></tr>`).join('')}</tbody></table>` : vacio('Sin licencias cargadas.')}</div>`;
+
+  const hechoDe = s => s.hecho || s.motivo || 'Sin dato';
+  const porHecho = {}; san12.forEach(s => { const k = hechoDe(s); porHecho[k] = (porHecho[k]||0) + 1; });
+  const sanBarras = obj => { const arr = Object.entries(obj).sort((a,b)=>b[1]-a[1]).slice(0,6); const max = arr.length ? arr[0][1] : 1;
+    return arr.map(([k,v]) => `<div style="display:grid;grid-template-columns:190px 1fr 40px;gap:10px;align-items:center;font-size:12.5px;margin:7px 0"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(k)}">${escHtml(k)}</span><div class="pbar"><div class="pfill" style="width:${Math.max(4,v/max*100)}%;background:var(--d)"></div></div><strong style="text-align:right">×${v}</strong></div>`).join(''); };
+  const filaSan = s => `<tr><td>${fF(s.fecha)}</td><td>${sanPill(s)}${s.esSusp && s.dias ? `<div style="font-size:11px;color:var(--dim)">${s.dias} ${s.dias===1?'día':'días'}${s.desde ? ' · desde ' + fF(s.desde) : ''}</div>` : ''}</td>
+    <td>${escHtml(hechoDe(s))}${s.hecho ? '' : '<div style="font-size:11px;color:var(--dim)">Sin detalle del hecho</div>'}${s.agravante ? `<div style="font-size:11px;color:var(--w);font-weight:600">${escHtml(s.agravante)}</div>` : ''}</td>
+    <td style="font-size:11.5px;color:var(--dim)">${escHtml(s.hecho && s.motivo && sanSinAcento(s.motivo) !== sanSinAcento(s.hecho) ? s.motivo : '')}</td></tr>`;
+  const SAN_VISIBLES = 10;
+  const sanHtml = `<div class="cc" style="grid-column:1/-1"><div class="ct">Sanciones</div><div class="cs">${sanDisc.length} en el historial · ${san12.length} en los últimos 12 meses${sans.length > sanDisc.length ? ` · ${sans.length - sanDisc.length} ${sans.length - sanDisc.length === 1 ? 'anotación positiva' : 'anotaciones positivas'}` : ''}</div>
+    ${errSan ? vacio('No se pudieron traer las sanciones: ' + escHtml(errSan)) : !sans.length ? vacio('Sin sanciones cargadas.') : `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin:4px 0 12px">
+        <div><div class="klbl" style="margin-bottom:4px">Qué se le sancionó (12 meses)</div>${san12.length ? sanBarras(porHecho) : vacio('Nada en los últimos 12 meses.')}</div>
+        <div style="font-size:12.5px;line-height:1.8">
+          <div><span class="klbl">Suspensión en ${anioHoy}:</span> <strong style="color:${diasSuspAnio >= 20 ? 'var(--d)' : 'inherit'}">${diasSuspAnio} de 30 días</strong> <span style="color:var(--dim)">(tope art. 220 LCT)</span></div>
+          <div><span class="klbl">Ausencias sin aviso suspendidas (6 meses):</span> <strong>${asaSusp6}</strong></div>
+          <div><span class="klbl">Próxima por ausencia sin aviso, según escala:</span> <strong>${proxAsa}</strong> <span style="color:var(--dim)">· referencia, se analiza caso por caso</span></div>
+        </div>
+      </div>
+      <table><thead><tr><th>Fecha</th><th>Sanción</th><th>Hecho</th><th>Motivo en el sistema</th></tr></thead>
+        <tbody id="ficha-san-body">${sans.slice(0, SAN_VISIBLES).map(filaSan).join('')}</tbody></table>
+      ${sans.length > SAN_VISIBLES ? `<button class="btn bts liq-noprint" style="margin-top:10px" onclick="this.remove();document.getElementById('ficha-san-body').insertAdjacentHTML('beforeend', window._fichaSanResto||'')">Ver las ${sans.length - SAN_VISIBLES} anteriores</button>` : ''}`}</div>`;
+  window._fichaSanResto = sans.slice(SAN_VISIBLES).map(filaSan).join('');
 
   let sueldoHtml = '', liqHtml = '';
   if(esAdmin){
@@ -1373,10 +1463,11 @@ async function fichaRender(legajo){
   <div class="kgrid">
     ${kpi('kw','Días de ausencia (12 meses)', diasAusTot, compSector || 'Sin ausencias justificadas ni permisos gremiales')}
     ${kpi('kb','Días de licencia (12 meses)', licDias12, `${licDias} en todo el historial`)}
+    ${kpi('kd','Sanciones (12 meses)', errSan ? '-' : san12.length, errSan ? 'No disponible' : (((n)=> n + (n===1?' suspensión':' suspensiones'))(san12.filter(s=>s.esSusp).length) + ' · ' + sanDisc.length + ' en el historial'))}
     ${esAdmin ? kpi('ka','Último sueldo bruto', serie.length ? fichaPesos(serie[serie.length-1].total) : '-', serie.length ? 'Mes ' + serie[serie.length-1].mes : '') : ''}
     ${esAdmin ? kpi('kd','Sin causa, si fuera hoy', liq ? fichaPesos(liq.escenarios.sinCausa) : '-', liq ? 'Estimación' : '') : ''}
   </div>
-  <div class="cgrid">${ausHtml}${licHtml}${sueldoHtml}${liqHtml}</div>
+  <div class="cgrid">${ausHtml}${licHtml}${sanHtml}${sueldoHtml}${liqHtml}</div>
   <div style="font-size:11px;color:var(--dim);margin-top:10px">Información confidencial de uso interno de RRHH (Ley 25.326 de protección de datos personales).</div>`;
 
   if(serie.length && document.getElementById('ficha-ch-sueldo')){

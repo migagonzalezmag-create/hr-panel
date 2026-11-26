@@ -75,6 +75,10 @@ function doPost(e) {
       if (usuario.rol !== 'admin') return seg_json_({ error: 'Solo el administrador', code: 'PERM' });
       return seg_json_(seg_alertasVariables_());
     }
+    if (accion === 'sancionesLegajo') {
+      if (['admin', 'director', 'analyst', 'supervisor'].indexOf(usuario.rol) < 0) return seg_json_({ error: 'Sin permiso', code: 'PERM' });
+      return seg_json_(seg_sancionesLegajo_(usuario, body.legajo));
+    }
     if (accion === 'sueldosLegajo') {
       if (usuario.rol !== 'admin') return seg_json_({ error: 'Solo el administrador puede ver la liquidación final', code: 'PERM' });
       return seg_json_(seg_sueldosLegajo_(body.legajo));
@@ -117,6 +121,52 @@ function seg_sueldosLegajo_(legajo) {
     var monto = val[i][iM];
     if (typeof monto !== 'number') monto = Number(String(txt[i][iM]).replace(/\./g, '').replace(',', '.')) || 0;
     out.push({ Novedad: String(txt[i][iN]), Monto: monto, Mes: String(txt[i][iMes]).trim() });
+  }
+  return out;
+}
+
+
+// ─── Ficha 360: sanciones de UNA persona ───────────────────────────
+// Lee la hoja "Sanciones", donde se pega tal cual el reporte del sistema
+// san_historialporlegajo (con sus encabezados: fklegajo, fecnov, sancion...).
+// Devuelve solo las filas de ese legajo que tienen sanción. Las filas sin
+// sanción son "casos" que genera el sistema y no se usan.
+// Supervisores y analistas con sucursal solo ven legajos de su alcance.
+function seg_sancionesLegajo_(usuario, legajo) {
+  var norm = function (v) { var s = String(v == null ? '' : v).trim().replace(/\.0+$/, ''); var n = parseInt(s, 10); return isNaN(n) ? s : String(n); };
+  var leg = norm(legajo);
+  if (!leg) return { error: 'Falta el legajo' };
+
+  var alcance = seg_alcance_(usuario);
+  if (alcance) {
+    var permitido = false;
+    seg_leerHoja_(SEG.HOJA_NOMINA, 'texto').forEach(function (e) {
+      if (norm(e['Legajo']) === leg && alcance.empleado(e)) permitido = true;
+    });
+    if (!permitido) return [];
+  }
+
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Sanciones');
+  if (!sheet) return { error: 'No existe la hoja Sanciones en Base Nini' };
+  var val = sheet.getDataRange().getValues();
+  if (!val.length) return [];
+  var enc = val[0].map(function (h) { return String(h).trim().toLowerCase(); });
+  var col = function (n) { return enc.indexOf(n); };
+  var iL = col('fklegajo'), iS = col('sancion');
+  if (iL < 0 || iS < 0) return { error: 'La hoja Sanciones no tiene las columnas fklegajo y sancion del reporte del sistema' };
+  var campos = ['fecnov', 'sancion', 'motivo', 'docfalta', 'docsancion', 'diassusp', 'fecdessusp', 'fecreinteg', 'fkusuario', 'descargo'];
+
+  var out = [];
+  for (var i = 1; i < val.length; i++) {
+    if (norm(val[i][iL]) !== leg) continue;
+    if (!String(val[i][iS]).trim()) continue;
+    var obj = {};
+    campos.forEach(function (c) {
+      var j = col(c); if (j < 0) return;
+      var v = val[i][j];
+      obj[c] = (v instanceof Date) ? Utilities.formatDate(v, 'America/Argentina/Buenos_Aires', 'yyyy-MM-dd') : (typeof v === 'string' ? v.trim() : v);
+    });
+    out.push(obj);
   }
   return out;
 }
