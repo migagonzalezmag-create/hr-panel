@@ -159,6 +159,8 @@ body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--text);min
 .cs{font-size:11px;color:var(--dim);margin-bottom:14px}
 canvas{max-height:220px}
 #dash-sec canvas{max-height:none}
+.dash-det{margin-top:14px;border-top:1px solid var(--border);padding-top:12px}
+.dash-det summary{cursor:pointer;font-weight:600;color:var(--a);font-size:13px}
 #dash-sec .kgrid{grid-template-columns:repeat(3,1fr)}
 @media(max-width:768px){#dash-sec .kgrid{grid-template-columns:1fr 1fr}}
 
@@ -565,10 +567,10 @@ function calcAntig(fechaStr){
 
 // ─── BUILD APP ────────────────────────────────────────────────
 const ROLES = {
-  analyst:    {label:'Analista RRHH',    badge:'ba', tabs:['Inicio','Dashboard','Nómina','Ficha 360','Sectores','Antigüedad','Ausentismo','Licencias','Academia','Planificación Horaria']},
+  analyst:    {label:'Analista RRHH',    badge:'ba', tabs:['Inicio','Dashboard','Nómina','Ficha 360','Ausentismo','Licencias','Academia','Planificación Horaria']},
   supervisor: {label:'Jefe / Supervisor', badge:'bs', tabs:['Inicio','Nómina','Ficha 360','Ausentismo','Licencias','Academia','Planificación Horaria']},
-  director:   {label:'Dirección',         badge:'bd', tabs:['Inicio','Ejecutivo','Composición','Ausentismo','Sueldos','Nómina','Ficha 360','Negociaciones','Academia','Planificación Horaria']},
-  admin:      {label:'Administrador',     badge:'bd', tabs:['Inicio','Dashboard','Nómina','Ficha 360','Sectores','Antigüedad','Ejecutivo','Composición','Ausentismo','Licencias','Sueldos','Negociaciones','Liquidación final','Academia','Planificación Horaria']},
+  director:   {label:'Dirección',         badge:'bd', tabs:['Inicio','Dashboard','Ausentismo','Sueldos','Nómina','Ficha 360','Negociaciones','Academia','Planificación Horaria']},
+  admin:      {label:'Administrador',     badge:'bd', tabs:['Inicio','Dashboard','Nómina','Ficha 360','Ausentismo','Licencias','Sueldos','Negociaciones','Liquidación final','Academia','Planificación Horaria']},
 };
 
 // Íconos de línea (se ven iguales en cualquier dispositivo)
@@ -576,12 +578,8 @@ const _svg = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
 const TAB_ICONS = {
   'Inicio': _svg('<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/>'),
   'Dashboard': _svg('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'),
-  'Ejecutivo': _svg('<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>'),
   'Nómina': _svg('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.8c1.6.8 2.6 2.5 3 5.2"/>'),
   'Ficha 360': _svg('<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10.5" r="2.5"/><path d="M5.5 16.5c.6-1.8 1.9-2.8 3.5-2.8s2.9 1 3.5 2.8M15 9h3M15 12.5h3"/>'),
-  'Sectores': _svg('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'),
-  'Antigüedad': _svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
-  'Composición': _svg('<path d="M12 3a9 9 0 1 0 9 9h-9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/>'),
   'Mi Equipo': _svg('<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/>'),
   'Novedades': _svg('<path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4M9 13h6M9 17h6"/>'),
   'Ausentismo': _svg('<rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4M9.5 13.5l5 5M14.5 13.5l-5 5"/>'),
@@ -595,8 +593,8 @@ const TAB_ICONS = {
 const TAB_ICON_DEF = _svg('<path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4"/>');
 // Grupos del menú (el orden de los grupos es el del menú)
 const TAB_GROUPS = [
-  { nombre: null,          tabs: ['Inicio','Dashboard','Ejecutivo'] },
-  { nombre: 'Personal',    icono: TAB_ICONS['Nómina'],         tabs: ['Nómina','Ficha 360','Sectores','Antigüedad','Composición','Mi Equipo'] },
+  { nombre: null,          tabs: ['Inicio','Dashboard'] },
+  { nombre: 'Personal',    icono: TAB_ICONS['Nómina'],         tabs: ['Nómina','Ficha 360','Mi Equipo'] },
   { nombre: 'Asistencia',  icono: TAB_ICONS['Ausentismo'],     tabs: ['Ausentismo','Licencias','Novedades'] },
   { nombre: 'Costos',      icono: TAB_ICONS['Sueldos'],        tabs: ['Sueldos'] },
   { nombre: 'Negociación', icono: TAB_ICONS['Negociaciones'],  tabs: ['Negociaciones','Liquidación final'] },
@@ -711,12 +709,8 @@ function renderTab(tab){
     'Dashboard':(el)=>analystDash(el),
     'Nómina':(el)=>nominaTab(el),
     'Ficha 360':(el)=>fichaTab(el),
-    'Sectores':(el)=>sectoresTab(el),
-    'Antigüedad':(el)=>antigTab(el),
     'Mi Equipo':(el)=>myTeam(el),
     'Novedades':(el)=>novedadesTab(el),
-    'Ejecutivo':(el)=>execDash(el),
-    'Composición':(el)=>composTab(el),
     'Ausentismo':(el)=>ausentismoTab(el),
     'Licencias':(el)=>licenciasTab(el),
     'Sueldos':(el)=>sueldosTab(el),
@@ -757,6 +751,9 @@ const dashEtiquetas = { id:'dashEtiquetas', afterDatasetsDraw(chart){
   ctx.restore();
 }};
 
+const DASH_CONV = [ {clave:'COM', nombre:'Comercio'}, {clave:'CAM', nombre:'Camioneros'}, {clave:'VIA', nombre:'Viajantes'}, {clave:'FC', nombre:'Fuera de convenio'}, {clave:'OTRO', nombre:'Otro o sin dato'} ];
+function dashConv(e){ const c = String(e['Convenio']||'').toLowerCase();
+  return c.includes('fuera') ? 'FC' : c.includes('camion') ? 'CAM' : c.includes('viajante') ? 'VIA' : c.includes('comercio') ? 'COM' : 'OTRO'; }
 function dashTramo(a){ return a < 1 ? '0-1' : a < 2 ? '1-2' : a < 5 ? '2-5' : a < 10 ? '5-10' : a < 15 ? '10-15' : a < 20 ? '15-20' : '+20'; }
 const DASH_TRAMOS = ['0-1','1-2','2-5','5-10','10-15','15-20','+20'];
 function dashTurno(h){
@@ -766,6 +763,17 @@ function dashTurno(h){
   const m = s.match(/^(\d{1,2})[.:]/); if(!m) return 'Otro';
   const hr = parseInt(m[1],10);
   return hr < 12 ? 'Mañana' : hr < 20 ? 'Tarde' : 'Noche';
+}
+
+function dashTablaSectores(emp, sedes){
+  const convs = DASH_CONV.filter(c => emp.some(e => dashConv(e) === c.clave));
+  const sec = {}; emp.forEach(e => { const k = String(e['Sector']||'Sin dato').trim(); (sec[k] = sec[k] || []).push(e); });
+  const filas = Object.keys(sec).sort((a,b) => sec[b].length - sec[a].length);
+  const n = (arr, f) => { const v = arr.filter(f).length; return v ? dashNum(v) : '<span style="color:var(--dim)">-</span>'; };
+  const tot = emp.length;
+  return `<div style="overflow-x:auto;margin-top:12px"><table><thead><tr><th>Sector</th>${sedes.length>1?sedes.map(s=>`<th style="text-align:right">${DASH_SEDES[s].nombre}</th>`).join(''):''}<th style="text-align:right">Total</th><th style="text-align:right">% del total</th>${convs.map(c=>`<th style="text-align:right">${c.nombre}</th>`).join('')}</tr></thead><tbody>
+    ${filas.map(k => { const g = sec[k]; return `<tr><td><strong>${escHtml(k)}</strong></td>${sedes.length>1?sedes.map(s=>`<td style="text-align:right">${n(g, e=>dashSede(e)===s)}</td>`).join(''):''}<td style="text-align:right;font-weight:600">${dashNum(g.length)}</td><td style="text-align:right;color:var(--mid)">${dashPct(g.length/tot*100,1)}</td>${convs.map(c=>`<td style="text-align:right">${n(g, e=>dashConv(e)===c.clave)}</td>`).join('')}</tr>`; }).join('')}
+    </tbody></table></div>`;
 }
 
 function analystDash(el){
@@ -845,7 +853,8 @@ function dashRender(emp){
       ing12: g.filter(e => { const f = ing(e); return f && f > hace12; }).length,
       prueba: g.filter(e => { const f = ing(e); return f && f > hace6; }).length,
       mediana: dashMediana(an), promedio: avg(an),
-      fc: g.filter(e => String(e['Convenio']||'').toLowerCase().includes('fuera')).length,
+      conv: g.reduce((a,e) => { const k = dashConv(e); a[k] = (a[k]||0) + 1; return a; }, {}),
+      mujeres: g.filter(e => String(e['sexo']||'').trim().toUpperCase() === 'F').length,
       aus: ausMes(sede, ultMes), ausAnt: ausMes(sede, antMes),
       lic: licEnCurso(sede).length,
     };
@@ -890,7 +899,9 @@ function dashRender(emp){
       ${fila('En período de prueba', s=>dashNum(s.prueba))}
       ${fila('Antigüedad mediana', s=>dashAnios(s.mediana), 'La mitad del plantel tiene menos que esto')}
       ${fila('Antigüedad promedio', s=>dashAnios(s.promedio))}
-      ${fila('Fuera de convenio', s=>dashNum(s.fc)+' ('+dashPct(s.fc/s.dot*100,0)+')')}
+      <tr><td colspan="${sedes.length+2}" style="background:var(--surface2);font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--mid)">CONVENIO</td></tr>
+      ${DASH_CONV.map(c => fila(c.nombre, s=>{ const n = s.conv[c.clave]||0; return n ? dashNum(n)+' ('+dashPct(n/s.dot*100,0)+')' : '-'; })).join('')}
+      ${fila('Mujeres', s=>dashNum(s.mujeres)+' ('+dashPct(s.mujeres/s.dot*100,0)+')')}
       </tbody></table></div></div>`;
   })();
 
@@ -904,7 +915,8 @@ function dashRender(emp){
     <div class="cc"><div class="ct">Antigüedad del plantel</div><div class="cs">Mediana ${dashAnios(T.mediana)} · promedio ${dashAnios(T.promedio)}</div><div style="height:240px"><canvas id="ch-d-antig"></canvas></div></div>
     <div class="cc"><div class="ct">Turnos</div><div class="cs">Agrupados por hora de entrada</div><div style="height:240px"><canvas id="ch-d-turno"></canvas></div></div>
   </div>
-  <div class="cgrid"><div class="cc" style="grid-column:1/-1"><div class="ct">Personas por sector</div><div class="cs">Los ${nSect} sectores${ambas?', divididos por sede':''}</div><div style="height:${Math.max(220, nSect*26+50)}px"><canvas id="ch-d-sect"></canvas></div></div></div>`;
+  <div class="cgrid"><div class="cc" style="grid-column:1/-1"><div class="ct">Personas por sector</div><div class="cs">Los ${nSect} sectores${ambas?', divididos por sede':''}</div><div style="height:${Math.max(220, nSect*26+50)}px"><canvas id="ch-d-sect"></canvas></div>
+    <details class="dash-det"><summary>Ver el detalle por sector, sede y convenio</summary>${dashTablaSectores(emp, sedes)}</details></div></div>`;
 
   const grid = '#E3E8F2', tick = '#5B6474';
   const leyenda = ambas ? {display:true, position:'bottom', labels:{color:'#4B5563', boxWidth:12, font:{size:11}}} : {display:false};
@@ -1270,99 +1282,6 @@ function filterNom(q){
   rows.forEach(r=>r.style.display=r.textContent.toLowerCase().includes(qq)?'':'none');
 }
 
-function sectoresTab(el){
-  const employees_act=filterBySucursal(getActiveEmployees());
-  const sc=countBy(employees_act,'Sector');
-  const sorted=Object.entries(sc).sort((a,b)=>b[1]-a[1]);
-  const total=employees_act.length;
-
-  el.innerHTML=`<div class="sec active">
-  <div class="sh"><div><h2>Análisis por Sector</h2><p>Composición del plantel por área${sucursalTitle()}</p></div></div>
-  <div class="cgrid">
-    <div class="cc" style="grid-column:1/-1"><div class="ct">Headcount por Sector</div><div class="cs">Todos los sectores</div><canvas id="ch-all-sect"></canvas></div>
-  </div>
-  <div class="tcard">
-    <div class="thead"><h3>Detalle por Sector</h3></div>
-    <table><thead><tr><th>Sector</th><th>Empleados</th><th>% del Total</th><th>Distribución</th><th>Convenio Predominante</th></tr></thead>
-    <tbody>${sorted.map(([sec,cnt])=>{
-      const pct=((cnt/total)*100).toFixed(1);
-      const sEmp=employees_act.filter(e=>e['Sector']===sec);
-      const conv=Object.entries(countBy(sEmp,'Convenio')).sort((a,b)=>b[1]-a[1])[0];
-      return `<tr>
-        <td><strong>${sec}</strong></td>
-        <td><span style="font-weight:700;color:var(--a)">${cnt}</span></td>
-        <td>${pct}%</td>
-        <td><div class="pbar" style="width:140px"><div class="pfill" style="width:${Math.min(pct*3,100)}%;background:var(--a)"></div></div></td>
-        <td><span class="pill ${convPill(conv?conv[0]:'')}">${conv?conv[0]:'-'}</span></td>
-      </tr>`;}).join('')}
-    </tbody></table>
-  </div></div>`;
-
-  setTimeout(()=>{
-    charts.allsect=new Chart(document.getElementById('ch-all-sect'),{type:'bar',
-      data:{labels:sorted.map(e=>e[0]),datasets:[{data:sorted.map(e=>e[1]),
-        backgroundColor:sorted.map((_,i)=>`hsl(${(i*23)%360},65%,55%)`),borderRadius:5,borderSkipped:false}]},
-      options:{plugins:{legend:{display:false}},scales:{
-        x:{ticks:{color:'#5B6474',font:{size:9},maxRotation:45},grid:{display:false}},
-        y:{ticks:{color:'#5B6474'},grid:{color:'#E3E8F2'}}}}});
-  },50);
-}
-
-function antigTab(el){
-  const employees_act=filterBySucursal(getActiveEmployees());
-  const tramos={' <1 año':[],'1-3 años':[],'3-5 años':[],'5-10 años':[],'10-20 años':[],' +20 años':[]};
-  employees_act.forEach(e=>{
-    const a=calcAntig(e['Fecha Ingreso']);
-    const n=e['Nombre']||'';
-    if(a<1) tramos[' <1 año'].push(n);
-    else if(a<3) tramos['1-3 años'].push(n);
-    else if(a<5) tramos['3-5 años'].push(n);
-    else if(a<10) tramos['5-10 años'].push(n);
-    else if(a<20) tramos['10-20 años'].push(n);
-    else tramos[' +20 años'].push(n);
-  });
-
-  // Longest serving
-  const sorted=[...employees_act].sort((a,b)=>calcAntig(b['Fecha Ingreso'])-calcAntig(a['Fecha Ingreso']));
-
-  el.innerHTML=`<div class="sec active">
-  <div class="sh"><div><h2>Análisis de Antigüedad</h2><p>Distribución temporal del plantel</p></div></div>
-  <div class="kgrid">
-    ${Object.entries(tramos).map(([t,arr],i)=>{
-      const cols=['kd','kw','ka','ka','kc','kc'];
-      return `<div class="kcard ${cols[i]}"><div class="klbl">${t}</div><div class="kval">${arr.length}</div>
-        <span class="kchg cne">${((arr.length/employees_act.length)*100).toFixed(1)}% del plantel</span></div>`;
-    }).join('')}
-  </div>
-  <div class="cgrid">
-    <div class="cc"><div class="ct">Pirámide de Antigüedad</div><div class="cs">Cantidad de empleados por tramo</div><canvas id="ch-ant2"></canvas></div>
-    <div class="cc"><div class="ct">Top 10 Mayor Antigüedad</div><div class="cs">Empleados con más trayectoria</div>
-      <div style="margin-top:8px">
-      ${sorted.slice(0,10).map((e,i)=>{
-        const a=calcAntig(e['Fecha Ingreso']);
-        return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;overflow:hidden">
-          <span style="color:var(--dim);font-size:11px;width:18px;flex-shrink:0">${i+1}</span>
-          <div class="av notranslate" translate="no" style="background:${avColor(e['Nombre']||'')};flex-shrink:0">${avSafe(e['Nombre']||'')}</div>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e['Nombre']||'-'}</div>
-            <div style="font-size:10px;color:var(--dim)">${e['Sector']||'-'}</div>
-          </div>
-          <span style="font-size:12px;font-weight:700;color:var(--c);flex-shrink:0">${a.toFixed(1)}a</span>
-        </div>`;}).join('')}
-      </div>
-    </div>
-  </div></div>`;
-
-  setTimeout(()=>{
-    charts.ant2=new Chart(document.getElementById('ch-ant2'),{type:'bar',
-      data:{labels:Object.keys(tramos),datasets:[{data:Object.values(tramos).map(a=>a.length),
-        backgroundColor:['#E81911','#D97706','#002E9D','#002E9D','#0F7B4A','#0F7B4A'],borderRadius:6,borderSkipped:false}]},
-      options:{plugins:{legend:{display:false}},scales:{
-        x:{ticks:{color:'#5B6474',font:{size:10}},grid:{display:false}},
-        y:{ticks:{color:'#5B6474'},grid:{color:'#E3E8F2'}}}}});
-  },50);
-}
-
 // ═══════════════════════════════════════════════════════════════
 // SUPERVISOR TABS
 // ═══════════════════════════════════════════════════════════════
@@ -1518,103 +1437,6 @@ function clearNov(){
 // ═══════════════════════════════════════════════════════════════
 // DIRECTOR TABS
 // ═══════════════════════════════════════════════════════════════
-function execDash(el){
-  const emp_act=filterBySucursal(getActiveEmployees());
-  const total=emp_act.length;
-  const conv=countBy(emp_act,'Convenio');
-  const avgA=avg(emp_act.map(e=>calcAntig(e['Fecha Ingreso'])));
-  const sectors=[...new Set(emp_act.map(e=>e['Sector']))].length;
-  const mF=emp_act.filter(e=>e['sexo']==='F').length;
-  const sucTit = sucursalTitle();
-
-  el.innerHTML=`<div class="sec active">
-  <div class="sh"><div><h2>Dashboard Ejecutivo</h2><p>Indicadores estratégicos del plantel${sucTit} · datos en vivo</p></div>
-    <button class="btn bts" onclick="loadData().then(()=>renderTab('Ejecutivo'))">↻ Actualizar</button>
-  </div>
-  <div class="ag alert">${total} empleados activos cargados desde Google Sheets en tiempo real</div>
-  <div class="kgrid">
-    <div class="kcard ka"><div class="klbl">Headcount Total</div><div class="kval">${total}</div><span class="kchg cup">Base activa</span></div>
-    <div class="kcard kc"><div class="klbl">Antigüedad Prom.</div><div class="kval">${avgA.toFixed(1)}a</div><span class="kchg cup">Plantel consolidado</span></div>
-    <div class="kcard kb"><div class="klbl">Sectores Activos</div><div class="kval">${sectors}</div><span class="kchg cne">Áreas operativas</span></div>
-    <div class="kcard kw"><div class="klbl">Fuera Convenio</div><div class="kval">${conv['Fuera de Convenio']||0}</div><span class="kchg cne">${(((conv['Fuera de Convenio']||0)/total)*100).toFixed(1)}% del total</span></div>
-    <div class="kcard kd"><div class="klbl">Diversidad F</div><div class="kval">${((mF/total)*100).toFixed(1)}%</div><span class="kchg cne">${mF} mujeres</span></div>
-  </div>
-  <div class="cgrid">
-    <div class="cc"><div class="ct">Distribución por Convenio</div><div class="cs">Composición del plantel</div><canvas id="ch-exe-conv"></canvas></div>
-    <div class="cc"><div class="ct">Top 6 Sectores</div><div class="cs">Por cantidad de empleados</div><canvas id="ch-exe-sec"></canvas></div>
-  </div>
-  <div class="chl">
-    <div style="font-family:Poppins,sans-serif;font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px">Resumen Estratégico</div>
-    <div class="chlg">
-      <div class="ci"><h4>Plantel + antiguos (>10a)</h4><div class="amt">${emp_act.filter(e=>calcAntig(e['Fecha Ingreso'])>10).length}</div></div>
-      <div class="ci"><h4>Incorporaciones recientes (<1a)</h4><div class="amt grn">${emp_act.filter(e=>calcAntig(e['Fecha Ingreso'])<1).length}</div></div>
-      <div class="ci"><h4>Convenio Camioneros</h4><div class="amt">${conv['Camioneros']||0}</div></div>
-      <div class="ci"><h4>Convenio Comercio</h4><div class="amt">${conv['Comercio']||0}</div></div>
-      <div class="ci"><h4>Turno mañana (06-14)</h4><div class="amt">${emp_act.filter(e=>e['HORARIO']==='06.00 a 14.00').length}</div></div>
-      <div class="ci"><h4>Rotativos</h4><div class="amt dng">${emp_act.filter(e=>e['HORARIO']==='ROTATIVO').length}</div></div>
-    </div>
-  </div></div>`;
-
-  setTimeout(()=>{
-    const cv=countBy(emp_act,'Convenio');
-    charts.execonv=new Chart(document.getElementById('ch-exe-conv'),{type:'doughnut',
-      data:{labels:Object.keys(cv),datasets:[{data:Object.values(cv),backgroundColor:['#002E9D','#5B7FD6','#0F7B4A','#D97706'],borderWidth:0,hoverOffset:5}]},
-      options:{plugins:{legend:{labels:{color:'#4B5563',font:{size:11}}}},cutout:'60%'}});
-
-    const sc=countBy(emp_act,'Sector');
-    const top6=Object.entries(sc).sort((a,b)=>b[1]-a[1]).slice(0,6);
-    charts.exesec=new Chart(document.getElementById('ch-exe-sec'),{type:'bar',
-      data:{labels:top6.map(e=>e[0]),datasets:[{data:top6.map(e=>e[1]),backgroundColor:'rgba(15,123,74,.7)',borderRadius:5,borderSkipped:false}]},
-      options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#5B6474',font:{size:10}},grid:{display:false}},y:{ticks:{color:'#5B6474'},grid:{color:'#E3E8F2'}}}}});
-  },50);
-}
-
-function composTab(el){
-  const emp_act=filterBySucursal(getActiveEmployees());
-  const conv=countBy(emp_act,'Convenio');
-  const sexo=countBy(emp_act,'sexo');
-  const total=emp_act.length;
-  const sucTit = sucursalTitle();
-
-  el.innerHTML=`<div class="sec active">
-  <div class="sh"><div><h2>Composición del Plantel</h2><p>Análisis demográfico y por convenio${sucTit}</p></div></div>
-  <div class="cgrid c3">
-    <div class="cc"><div class="ct">Convenio</div><div class="cs">Distribución por tipo</div><canvas id="ch-comp-conv"></canvas></div>
-    <div class="cc"><div class="ct">Género</div><div class="cs">M / F</div><canvas id="ch-comp-sex"></canvas></div>
-    <div class="cc"><div class="ct">Turnos</div><div class="cs">Por horario</div><canvas id="ch-comp-hor"></canvas></div>
-  </div>
-  <div class="tcard">
-    <div class="thead"><h3>Convenio por Sector (principales)</h3></div>
-    <table><thead><tr><th>Sector</th><th>Total</th><th>Comercio</th><th>Camioneros</th><th>F. Convenio</th><th>Viajantes</th></tr></thead>
-    <tbody>${Object.entries(countBy(emp_act,'Sector')).sort((a,b)=>b[1]-a[1]).slice(0,12).map(([sec,cnt])=>{
-      const s=emp_act.filter(e=>e['Sector']===sec);
-      const cv=countBy(s,'Convenio');
-      return `<tr>
-        <td><strong>${sec}</strong></td>
-        <td><span style="font-weight:700;color:var(--a)">${cnt}</span></td>
-        <td>${cv['Comercio']||0}</td><td>${cv['Camioneros']||0}</td>
-        <td>${cv['Fuera de Convenio']||0}</td><td>${cv['Viajantes']||0}</td>
-      </tr>`;}).join('')}
-    </tbody></table>
-  </div></div>`;
-
-  setTimeout(()=>{
-    charts.compconv=new Chart(document.getElementById('ch-comp-conv'),{type:'doughnut',
-      data:{labels:Object.keys(conv),datasets:[{data:Object.values(conv),backgroundColor:['#002E9D','#5B7FD6','#0F7B4A','#D97706'],borderWidth:0,hoverOffset:5}]},
-      options:{plugins:{legend:{labels:{color:'#4B5563',font:{size:10}}}},cutout:'55%'}});
-
-    charts.compsex=new Chart(document.getElementById('ch-comp-sex'),{type:'doughnut',
-      data:{labels:['Masculino','Femenino'],datasets:[{data:[sexo['M']||0,sexo['F']||0],backgroundColor:['#002E9D','#D97706'],borderWidth:0,hoverOffset:5}]},
-      options:{plugins:{legend:{labels:{color:'#4B5563',font:{size:10}}}},cutout:'55%'}});
-
-    const hor=countBy(emp_act,'HORARIO');
-    const topH=Object.entries(hor).sort((a,b)=>b[1]-a[1]).slice(0,5);
-    charts.comphor=new Chart(document.getElementById('ch-comp-hor'),{type:'doughnut',
-      data:{labels:topH.map(e=>e[0]),datasets:[{data:topH.map(e=>e[1]),backgroundColor:['#0F7B4A','#5B7FD6','#E81911','#D97706','#5B6474'],borderWidth:0,hoverOffset:5}]},
-      options:{plugins:{legend:{labels:{color:'#4B5563',font:{size:9}}}},cutout:'55%'}});
-  },50);
-}
-
 function distribTab(el){
   const emp_act=getActiveEmployees();
   const sc=countBy(emp_act,'Sector');
